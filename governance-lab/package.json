@@ -1,0 +1,13 @@
+{
+  "name": "governance-lab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A helpful agent with an unguarded tool. Zero dependencies.",
+  "type": "commonjs",
+  "main": "run.js",
+  "scripts": {
+    "start": "node run.js"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

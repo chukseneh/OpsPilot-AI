@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "refund-limit",
+      "description": "Refunds over $500 are refused.",
+      "when": {
+        "actionType": { "eq": "refund" },
+        "amount": { "gt": 500 }
+      },
+      "verdict": "deny"
+    }
+  ]
+}
