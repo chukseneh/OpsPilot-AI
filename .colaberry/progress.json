@@ -1,0 +1,432 @@
+{
+  "schema_version": 2,
+  "project": "OpsPilot AI — Enterprise AI Operations, Workflow & Risk Automation Platform",
+  "totals": {
+    "stories_total": 12,
+    "stories_verified": 0,
+    "stories_submitted": 0,
+    "stories_in_progress": 0,
+    "stories_not_started": 12,
+    "criteria_total": 0,
+    "criteria_passed": 0,
+    "points_awarded": 773
+  },
+  "stories": [
+    {
+      "id": "STORY-000",
+      "release": null,
+      "acceptance_total": 5,
+      "criteria": [
+        {
+          "text": "Given the Command Center, when it is opened, then every tab is reachable and every card drills down one level.",
+          "passed": false
+        },
+        {
+          "text": "Given sample mode, when any tab is shown, then the sample data is visibly labelled as sample.",
+          "passed": false
+        },
+        {
+          "text": "Given the Command Center, when any tab renders, then .colaberry/plan.json and .colaberry/progress.json are both committed in this repo and every tab reads its content from them at runtime rather than from hard-coded values.",
+          "passed": false
+        },
+        {
+          "text": "Given the Command Center, when any tab is shown, then .colaberry/manifest.json is committed in this repo and every tab shows how old that data is and warns when the age exceeds a week.",
+          "passed": false
+        },
+        {
+          "text": "Trust — no tab shows a number, a connection or a result the project has not actually produced.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 0,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 133,
+        "outstanding": []
+      }
+    },
+    {
+      "id": "STORY-001",
+      "release": "r0",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given multiple agents are available, when I initiate a process operation, then the system orchestrates the agents to complete the operation.",
+          "passed": false
+        },
+        {
+          "text": "Given an agent fails during orchestration, when the system detects the failure, then it reallocates tasks to other agents.",
+          "passed": false
+        },
+        {
+          "text": "Trust: The system logs all orchestration activities for audit purposes.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 0,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 80,
+        "outstanding": []
+      }
+    },
+    {
+      "id": "STORY-002",
+      "release": "r0",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a set of process data, when the analysis is initiated, then the system should provide a detailed report of inefficiencies.",
+          "passed": false
+        },
+        {
+          "text": "Given an incomplete data set, when the analysis is attempted, then the system should notify the user of missing data.",
+          "passed": false
+        },
+        {
+          "text": "Trust: The system logs all analysis activities with timestamps and user IDs for audit purposes.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 0,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 80,
+        "outstanding": []
+      }
+    },
+    {
+      "id": "STORY-003",
+      "release": "r1",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given AI systems are registered, When a risk assessment is performed, Then risks are identified and categorized.",
+          "passed": false
+        },
+        {
+          "text": "Given AI systems are registered, When a risk assessment is performed, Then it suggests mitigation actions.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Risk assessment results are logged for audit purposes.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 0,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": null,
+        "outstanding": []
+      }
+    },
+    {
+      "id": "STORY-004",
+      "release": "r1",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given AI systems are registered, When I view the inventory, Then it lists all systems with details.",
+          "passed": false
+        },
+        {
+          "text": "Given AI systems are registered, When I update a system's status, Then the inventory reflects the change.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Inventory changes are logged for audit purposes.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 0,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": null,
+        "outstanding": []
+      }
+    },
+    {
+      "id": "STORY-005",
+      "release": "r2",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a workflow is automated, When a high-risk action is detected, Then it requires human approval.",
+          "passed": false
+        },
+        {
+          "text": "Given a workflow is automated, When a low-risk action is detected, Then it executes automatically.",
+          "passed": false
+        },
+        {
+          "text": "Trust: All automated actions are logged with risk levels.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 0,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": null,
+        "outstanding": []
+      }
+    },
+    {
+      "id": "STORY-006",
+      "release": "r2",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given an action is performed, When it is logged, Then it includes a timestamp and user ID.",
+          "passed": false
+        },
+        {
+          "text": "Given a decision is made, When it is logged, Then it includes the decision rationale.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Logs are immutable and securely stored.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 0,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 80,
+        "outstanding": []
+      }
+    },
+    {
+      "id": "STORY-007",
+      "release": "r3",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a document is uploaded, When it is processed, Then structured information is extracted.",
+          "passed": false
+        },
+        {
+          "text": "Given a document is uploaded, When it contains errors, Then the system flags it for review.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Document processing actions are logged.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 0,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 80,
+        "outstanding": []
+      }
+    },
+    {
+      "id": "STORY-008",
+      "release": "r3",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given user assumptions are provided, When ROI is calculated, Then it shows estimated savings.",
+          "passed": false
+        },
+        {
+          "text": "Given user assumptions are incorrect, When ROI is calculated, Then it flags potential errors.",
+          "passed": false
+        },
+        {
+          "text": "Trust: ROI calculations are logged with assumptions.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 0,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 80,
+        "outstanding": []
+      }
+    },
+    {
+      "id": "STORY-009",
+      "release": "r4",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a jurisdiction is selected, When governance controls are configured, Then they reflect local regulations.",
+          "passed": false
+        },
+        {
+          "text": "Given a jurisdiction is selected, When controls are misconfigured, Then the system alerts the user.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Configuration changes are logged for audit purposes.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 0,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 80,
+        "outstanding": []
+      }
+    },
+    {
+      "id": "STORY-010",
+      "release": "r4",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given synthetic data is available, When a workflow is simulated, Then it executes as expected.",
+          "passed": false
+        },
+        {
+          "text": "Given synthetic data is incorrect, When a workflow is simulated, Then it flags errors.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Simulation results are logged for review.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 0,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 80,
+        "outstanding": []
+      }
+    },
+    {
+      "id": "STORY-011",
+      "release": "r0",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given process analysis data is available, when I access the dashboard, then I see the analysis results and automation opportunities.",
+          "passed": false
+        },
+        {
+          "text": "Given no data is available, when I access the dashboard, then I see a message indicating no data is present.",
+          "passed": false
+        },
+        {
+          "text": "Trust: The system logs all dashboard accesses and data views for audit purposes.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 0,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 80,
+        "outstanding": []
+      }
+    }
+  ]
+}
