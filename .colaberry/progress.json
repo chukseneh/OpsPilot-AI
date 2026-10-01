@@ -5,9 +5,9 @@
     "stories_total": 12,
     "stories_verified": 0,
     "stories_submitted": 0,
-    "stories_in_progress": 0,
-    "stories_not_started": 12,
-    "criteria_total": 0,
+    "stories_in_progress": 12,
+    "stories_not_started": 0,
+    "criteria_total": 38,
     "criteria_passed": 0,
     "points_awarded": 773
   },
@@ -43,15 +43,21 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
-        "criteria_total": 0,
+        "criteria_total": 5,
         "verified_at": null,
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
         "points_awarded": 133,
-        "outstanding": []
+        "outstanding": [
+          "Given the Command Center, when it is opened, then every tab is reachable and every card drills down one level.",
+          "Given sample mode, when any tab is shown, then the sample data is visibly labelled as sample.",
+          "Given the Command Center, when any tab renders, then .colaberry/plan.json and .colaberry/progress.json are both committed in this repo and every tab reads its content from them at runtime rather than from hard-coded values.",
+          "Given the Command Center, when any tab is shown, then .colaberry/manifest.json is committed in this repo and every tab shows how old that data is and warns when the age exceeds a week.",
+          "Trust — no tab shows a number, a connection or a result the project has not actually produced."
+        ]
       }
     },
     {
@@ -77,15 +83,19 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
-        "criteria_total": 0,
+        "criteria_total": 3,
         "verified_at": null,
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
         "points_awarded": 80,
-        "outstanding": []
+        "outstanding": [
+          "Given multiple agents are available, when I initiate a process operation, then the system orchestrates the agents to complete the operation.",
+          "Given an agent fails during orchestration, when the system detects the failure, then it reallocates tasks to other agents.",
+          "Trust: The system logs all orchestration activities for audit purposes."
+        ]
       }
     },
     {
@@ -111,15 +121,19 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
-        "criteria_total": 0,
+        "criteria_total": 3,
         "verified_at": null,
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
         "points_awarded": 80,
-        "outstanding": []
+        "outstanding": [
+          "Given a set of process data, when the analysis is initiated, then the system should provide a detailed report of inefficiencies.",
+          "Given an incomplete data set, when the analysis is attempted, then the system should notify the user of missing data.",
+          "Trust: The system logs all analysis activities with timestamps and user IDs for audit purposes."
+        ]
       }
     },
     {
@@ -145,15 +159,19 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
-        "criteria_total": 0,
+        "criteria_total": 3,
         "verified_at": null,
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
         "points_awarded": null,
-        "outstanding": []
+        "outstanding": [
+          "Given AI systems are registered, When a risk assessment is performed, Then risks are identified and categorized.",
+          "Given AI systems are registered, When a risk assessment is performed, Then it suggests mitigation actions.",
+          "Trust: Risk assessment results are logged for audit purposes."
+        ]
       }
     },
     {
@@ -179,15 +197,19 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
-        "criteria_total": 0,
+        "criteria_total": 3,
         "verified_at": null,
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
         "points_awarded": null,
-        "outstanding": []
+        "outstanding": [
+          "Given AI systems are registered, When I view the inventory, Then it lists all systems with details.",
+          "Given AI systems are registered, When I update a system's status, Then the inventory reflects the change.",
+          "Trust: Inventory changes are logged for audit purposes."
+        ]
       }
     },
     {
@@ -213,15 +235,19 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
-        "criteria_total": 0,
+        "criteria_total": 3,
         "verified_at": null,
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
         "points_awarded": null,
-        "outstanding": []
+        "outstanding": [
+          "Given a workflow is automated, When a high-risk action is detected, Then it requires human approval.",
+          "Given a workflow is automated, When a low-risk action is detected, Then it executes automatically.",
+          "Trust: All automated actions are logged with risk levels."
+        ]
       }
     },
     {
@@ -247,15 +273,19 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
-        "criteria_total": 0,
+        "criteria_total": 3,
         "verified_at": null,
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
         "points_awarded": 80,
-        "outstanding": []
+        "outstanding": [
+          "Given an action is performed, When it is logged, Then it includes a timestamp and user ID.",
+          "Given a decision is made, When it is logged, Then it includes the decision rationale.",
+          "Trust: Logs are immutable and securely stored."
+        ]
       }
     },
     {
@@ -281,15 +311,19 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
-        "criteria_total": 0,
+        "criteria_total": 3,
         "verified_at": null,
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
         "points_awarded": 80,
-        "outstanding": []
+        "outstanding": [
+          "Given a document is uploaded, When it is processed, Then structured information is extracted.",
+          "Given a document is uploaded, When it contains errors, Then the system flags it for review.",
+          "Trust: Document processing actions are logged."
+        ]
       }
     },
     {
@@ -315,15 +349,19 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
-        "criteria_total": 0,
+        "criteria_total": 3,
         "verified_at": null,
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
         "points_awarded": 80,
-        "outstanding": []
+        "outstanding": [
+          "Given user assumptions are provided, When ROI is calculated, Then it shows estimated savings.",
+          "Given user assumptions are incorrect, When ROI is calculated, Then it flags potential errors.",
+          "Trust: ROI calculations are logged with assumptions."
+        ]
       }
     },
     {
@@ -349,15 +387,19 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
-        "criteria_total": 0,
+        "criteria_total": 3,
         "verified_at": null,
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
         "points_awarded": 80,
-        "outstanding": []
+        "outstanding": [
+          "Given a jurisdiction is selected, When governance controls are configured, Then they reflect local regulations.",
+          "Given a jurisdiction is selected, When controls are misconfigured, Then the system alerts the user.",
+          "Trust: Configuration changes are logged for audit purposes."
+        ]
       }
     },
     {
@@ -383,15 +425,19 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
-        "criteria_total": 0,
+        "criteria_total": 3,
         "verified_at": null,
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
         "points_awarded": 80,
-        "outstanding": []
+        "outstanding": [
+          "Given synthetic data is available, When a workflow is simulated, Then it executes as expected.",
+          "Given synthetic data is incorrect, When a workflow is simulated, Then it flags errors.",
+          "Trust: Simulation results are logged for review."
+        ]
       }
     },
     {
@@ -417,15 +463,19 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
-        "criteria_total": 0,
+        "criteria_total": 3,
         "verified_at": null,
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
         "points_awarded": 80,
-        "outstanding": []
+        "outstanding": [
+          "Given process analysis data is available, when I access the dashboard, then I see the analysis results and automation opportunities.",
+          "Given no data is available, when I access the dashboard, then I see a message indicating no data is present.",
+          "Trust: The system logs all dashboard accesses and data views for audit purposes."
+        ]
       }
     }
   ]

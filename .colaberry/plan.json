@@ -1,0 +1,699 @@
+{
+  "schema_version": 2,
+  "project_name": "OpsPilot AI — Enterprise AI Operations, Workflow & Risk Automation Platform",
+  "descriptor": "An AI agent that analyses organisational operations, identifies inefficiencies and risks, automates workflows, and measures financial and operational impact.",
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "kind": "CONSTRAINT",
+      "cluster": "Integration",
+      "priority": "must",
+      "statement": "The system must connect to Microsoft 365 and Google Workspace to access emails and documents.",
+      "from_dimensions": [
+        "systems",
+        "integrations"
+      ],
+      "fulfilled_by": [
+        "STORY-001"
+      ]
+    },
+    {
+      "id": "REQ-002",
+      "kind": "CONSTRAINT",
+      "cluster": "Integration",
+      "priority": "must",
+      "statement": "The system must connect to CRM and ticketing systems to gather customer and request data.",
+      "from_dimensions": [
+        "systems",
+        "integrations"
+      ],
+      "fulfilled_by": []
+    },
+    {
+      "id": "REQ-003",
+      "kind": "FUNC",
+      "cluster": "Process Analysis",
+      "priority": "must",
+      "statement": "The system must analyse business processes to identify inefficiencies such as bottlenecks and duplicated activities.",
+      "from_dimensions": [
+        "desired_outcome",
+        "ai_opportunities"
+      ],
+      "fulfilled_by": [
+        "STORY-002"
+      ]
+    },
+    {
+      "id": "REQ-004",
+      "kind": "FUNC",
+      "cluster": "Process Analysis",
+      "priority": "must",
+      "statement": "The system must identify potential automation opportunities within business workflows.",
+      "from_dimensions": [
+        "desired_outcome",
+        "ai_opportunities"
+      ],
+      "fulfilled_by": [
+        "STORY-002"
+      ]
+    },
+    {
+      "id": "REQ-005",
+      "kind": "FUNC",
+      "cluster": "Risk & Governance",
+      "priority": "must",
+      "statement": "The system must perform risk assessments for AI systems in the organisation.",
+      "from_dimensions": [
+        "desired_outcome",
+        "ai_opportunities"
+      ],
+      "fulfilled_by": [
+        "STORY-003"
+      ]
+    },
+    {
+      "id": "REQ-006",
+      "kind": "FUNC",
+      "cluster": "Risk & Governance",
+      "priority": "must",
+      "statement": "The system must maintain an AI system inventory including system, department, purpose, risk, owner, and status.",
+      "from_dimensions": [
+        "desired_outcome",
+        "ai_opportunities"
+      ],
+      "fulfilled_by": [
+        "STORY-004"
+      ]
+    },
+    {
+      "id": "REQ-007",
+      "kind": "FUNC",
+      "cluster": "Human Oversight",
+      "priority": "must",
+      "statement": "The system must provide human-in-the-loop controls for high-risk actions.",
+      "from_dimensions": [
+        "desired_outcome",
+        "human_only_decisions"
+      ],
+      "fulfilled_by": [
+        "STORY-005"
+      ]
+    },
+    {
+      "id": "REQ-008",
+      "kind": "SAFE",
+      "cluster": "Audit & Logging",
+      "priority": "must",
+      "statement": "The system must log all actions and decisions for audit purposes.",
+      "from_dimensions": [
+        "security_context"
+      ],
+      "fulfilled_by": [
+        "STORY-006"
+      ]
+    },
+    {
+      "id": "REQ-009",
+      "kind": "FUNC",
+      "cluster": "ROI Calculation",
+      "priority": "must",
+      "statement": "The system must calculate estimated ROI based on user-provided assumptions.",
+      "from_dimensions": [
+        "desired_outcome"
+      ],
+      "fulfilled_by": [
+        "STORY-008"
+      ]
+    },
+    {
+      "id": "REQ-010",
+      "kind": "FUNC",
+      "cluster": "Document Intelligence",
+      "priority": "must",
+      "statement": "The system must allow users to upload documents such as invoices and contracts for structured information extraction.",
+      "from_dimensions": [
+        "desired_outcome",
+        "ai_opportunities"
+      ],
+      "fulfilled_by": [
+        "STORY-007"
+      ]
+    },
+    {
+      "id": "REQ-011",
+      "kind": "CONSTRAINT",
+      "cluster": "Integration",
+      "priority": "must",
+      "statement": "The system must connect to MCP servers for tool interactions such as finance and HR operations.",
+      "from_dimensions": [
+        "systems",
+        "integrations"
+      ],
+      "fulfilled_by": []
+    },
+    {
+      "id": "REQ-012",
+      "kind": "FUNC",
+      "cluster": "Agent Orchestration",
+      "priority": "must",
+      "statement": "The system must support multi-agent orchestration for process, risk, and finance operations.",
+      "from_dimensions": [
+        "desired_outcome",
+        "ai_opportunities"
+      ],
+      "fulfilled_by": [
+        "STORY-001"
+      ]
+    },
+    {
+      "id": "REQ-013",
+      "kind": "FUNC",
+      "cluster": "User Interface",
+      "priority": "must",
+      "statement": "The system must provide a dashboard to display process analysis results and automation opportunities.",
+      "from_dimensions": [
+        "desired_outcome"
+      ],
+      "fulfilled_by": [
+        "STORY-011"
+      ]
+    },
+    {
+      "id": "REQ-014",
+      "kind": "FUNC",
+      "cluster": "Simulation",
+      "priority": "must",
+      "statement": "The system must simulate workflows using synthetic data for demonstration purposes.",
+      "from_dimensions": [
+        "desired_outcome"
+      ],
+      "fulfilled_by": [
+        "STORY-010"
+      ]
+    },
+    {
+      "id": "REQ-015",
+      "kind": "FUNC",
+      "cluster": "Governance",
+      "priority": "must",
+      "statement": "The system must provide configurable governance controls adaptable to different jurisdictions.",
+      "from_dimensions": [
+        "desired_outcome",
+        "constraints"
+      ],
+      "fulfilled_by": [
+        "STORY-009"
+      ]
+    },
+    {
+      "id": "REQ-016",
+      "kind": "FUNC",
+      "cluster": "Risk & Governance",
+      "priority": "should",
+      "statement": "The system must perform privacy assessments for AI systems in the organisation.",
+      "from_dimensions": [
+        "desired_outcome",
+        "ai_opportunities"
+      ],
+      "fulfilled_by": []
+    },
+    {
+      "id": "REQ-017",
+      "kind": "FUNC",
+      "cluster": "Risk & Governance",
+      "priority": "should",
+      "statement": "The system must support real-time risk assessment for ongoing operations.",
+      "from_dimensions": [
+        "desired_outcome",
+        "ai_opportunities"
+      ],
+      "fulfilled_by": []
+    },
+    {
+      "id": "REQ-018",
+      "kind": "FUNC",
+      "cluster": "User Interface",
+      "priority": "should",
+      "statement": "The system must provide a workflow builder for users to design and automate processes.",
+      "from_dimensions": [
+        "desired_outcome"
+      ],
+      "fulfilled_by": []
+    }
+  ],
+  "releases": [
+    {
+      "key": "r0",
+      "demo": "Show integration with Microsoft 365 and Google Workspace, and demonstrate process analysis identifying inefficiencies.",
+      "goal": "Establish core integrations and basic process analysis capabilities.",
+      "name": "Initial Integration & Process Analysis",
+      "week_end": 2,
+      "week_start": 1,
+      "story_ids": [
+        "STORY-001",
+        "STORY-002",
+        "STORY-011"
+      ],
+      "starts_on": "2026-10-01",
+      "ends_on": "2026-10-01",
+      "is_demo_target": true
+    },
+    {
+      "key": "r1",
+      "demo": "Demonstrate risk assessment and AI system inventory features with audit logging.",
+      "goal": "Implement risk assessment and AI system inventory management.",
+      "name": "Risk & Governance Features",
+      "week_end": 4,
+      "week_start": 3,
+      "story_ids": [
+        "STORY-003",
+        "STORY-004"
+      ],
+      "starts_on": "2026-10-01",
+      "ends_on": "2026-10-01",
+      "is_demo_target": false
+    },
+    {
+      "key": "r2",
+      "demo": "Showcase an automated workflow with human approval for high-risk actions.",
+      "goal": "Enable workflow automation with human-in-the-loop controls.",
+      "name": "Automation & Human Oversight",
+      "week_end": 6,
+      "week_start": 5,
+      "story_ids": [
+        "STORY-005",
+        "STORY-006"
+      ],
+      "starts_on": "2026-10-01",
+      "ends_on": "2026-10-01",
+      "is_demo_target": false
+    },
+    {
+      "key": "r3",
+      "demo": "Demonstrate document upload and structured information extraction with ROI calculation.",
+      "goal": "Implement document intelligence and ROI calculation features.",
+      "name": "Document Intelligence & ROI Calculation",
+      "week_end": 8,
+      "week_start": 7,
+      "story_ids": [
+        "STORY-007",
+        "STORY-008"
+      ],
+      "starts_on": "2026-10-01",
+      "ends_on": "2026-10-01",
+      "is_demo_target": false
+    },
+    {
+      "key": "r4",
+      "demo": "Show configurable governance controls and simulate a workflow using synthetic data.",
+      "goal": "Enhance governance controls and add workflow simulation capabilities.",
+      "name": "Advanced Governance & Simulation",
+      "week_end": 10,
+      "week_start": 9,
+      "story_ids": [
+        "STORY-009",
+        "STORY-010"
+      ],
+      "starts_on": "2026-10-01",
+      "ends_on": "2026-10-01",
+      "is_demo_target": false
+    }
+  ],
+  "stories": [
+    {
+      "id": "STORY-001",
+      "title": "Enable Multi-Agent Orchestration for Process Operations",
+      "release": "r0",
+      "fulfills": [
+        "REQ-001",
+        "REQ-012"
+      ],
+      "narrative": "As an operations manager, I want to orchestrate multiple agents for process, risk, and finance operations, so that I can ensure efficient and coordinated workflows.",
+      "acceptance": [
+        "Given multiple agents are available, when I initiate a process operation, then the system orchestrates the agents to complete the operation.",
+        "Given an agent fails during orchestration, when the system detects the failure, then it reallocates tasks to other agents.",
+        "Trust: The system logs all orchestration activities for audit purposes."
+      ],
+      "blocked_by": [],
+      "owner_agent": "operations_manager",
+      "failure_paths": [
+        "Agent unavailability",
+        "Network failure",
+        "API rate limits"
+      ],
+      "task_guidance": "Implement orchestration logic using Microsoft 365 and Google Workspace APIs to coordinate agent activities.",
+      "due_on": "2026-10-01",
+      "due_baseline_on": "2026-10-01"
+    },
+    {
+      "id": "STORY-002",
+      "title": "Perform Process Analysis",
+      "release": "r0",
+      "fulfills": [
+        "REQ-003",
+        "REQ-004"
+      ],
+      "narrative": "As a process analyst, I want to perform process analysis, so that I can identify inefficiencies and areas for improvement.",
+      "acceptance": [
+        "Given a set of process data, when the analysis is initiated, then the system should provide a detailed report of inefficiencies.",
+        "Given an incomplete data set, when the analysis is attempted, then the system should notify the user of missing data.",
+        "Trust: The system logs all analysis activities with timestamps and user IDs for audit purposes."
+      ],
+      "blocked_by": [],
+      "owner_agent": "process analyst",
+      "failure_paths": [
+        "Data set is incomplete",
+        "Analysis process is interrupted",
+        "User lacks permission to perform analysis"
+      ],
+      "task_guidance": "Implement the process analysis module to handle data input, processing, and report generation. Ensure logging of all analysis activities in the audit trail.",
+      "due_on": "2026-10-01",
+      "due_baseline_on": "2026-10-01"
+    },
+    {
+      "id": "STORY-003",
+      "title": "Implement Risk Assessment",
+      "release": "r1",
+      "fulfills": [
+        "REQ-005"
+      ],
+      "narrative": "As a compliance officer, I want OpsPilot to perform risk assessments, so that I can manage AI system risks effectively.",
+      "acceptance": [
+        "Given AI systems are registered, When a risk assessment is performed, Then risks are identified and categorized.",
+        "Given AI systems are registered, When a risk assessment is performed, Then it suggests mitigation actions.",
+        "Trust: Risk assessment results are logged for audit purposes."
+      ],
+      "blocked_by": [
+        "STORY-002"
+      ],
+      "owner_agent": "Risk Agent",
+      "failure_paths": [
+        "Incomplete system data",
+        "Risk model errors",
+        "Assessment timeout"
+      ],
+      "task_guidance": "Use Claude's risk-assessment skill to evaluate AI systems.",
+      "due_on": "2026-10-01",
+      "due_baseline_on": "2026-10-01"
+    },
+    {
+      "id": "STORY-004",
+      "title": "Maintain AI System Inventory",
+      "release": "r1",
+      "fulfills": [
+        "REQ-006"
+      ],
+      "narrative": "As an IT manager, I want OpsPilot to maintain an AI system inventory, so that I have a comprehensive view of all AI systems.",
+      "acceptance": [
+        "Given AI systems are registered, When I view the inventory, Then it lists all systems with details.",
+        "Given AI systems are registered, When I update a system's status, Then the inventory reflects the change.",
+        "Trust: Inventory changes are logged for audit purposes."
+      ],
+      "blocked_by": [
+        "STORY-003"
+      ],
+      "owner_agent": "Governance Agent",
+      "failure_paths": [
+        "Database connection failure",
+        "Data inconsistency",
+        "Unauthorized access"
+      ],
+      "task_guidance": "Implement inventory management using a PostgreSQL database.",
+      "due_on": "2026-10-01",
+      "due_baseline_on": "2026-10-01"
+    },
+    {
+      "id": "STORY-005",
+      "title": "Enable Workflow Automation with Human Oversight",
+      "release": "r2",
+      "fulfills": [
+        "REQ-007"
+      ],
+      "narrative": "As a process manager, I want OpsPilot to automate workflows with human oversight, so that high-risk actions are reviewed before execution.",
+      "acceptance": [
+        "Given a workflow is automated, When a high-risk action is detected, Then it requires human approval.",
+        "Given a workflow is automated, When a low-risk action is detected, Then it executes automatically.",
+        "Trust: All automated actions are logged with risk levels."
+      ],
+      "blocked_by": [
+        "STORY-004"
+      ],
+      "owner_agent": "Automation Agent",
+      "failure_paths": [
+        "Approval delays",
+        "Incorrect risk categorization",
+        "Automation failure"
+      ],
+      "task_guidance": "Use Claude's workflow-design skill to implement automation with approval gates.",
+      "due_on": "2026-10-01",
+      "due_baseline_on": "2026-10-01"
+    },
+    {
+      "id": "STORY-006",
+      "title": "Log Actions for Audit Purposes",
+      "release": "r2",
+      "fulfills": [
+        "REQ-008"
+      ],
+      "narrative": "As a security officer, I want OpsPilot to log all actions and decisions, so that I can audit system activities.",
+      "acceptance": [
+        "Given an action is performed, When it is logged, Then it includes a timestamp and user ID.",
+        "Given a decision is made, When it is logged, Then it includes the decision rationale.",
+        "Trust: Logs are immutable and securely stored."
+      ],
+      "blocked_by": [
+        "STORY-005"
+      ],
+      "owner_agent": "Audit Agent",
+      "failure_paths": [
+        "Log storage failure",
+        "Unauthorized log access",
+        "Log tampering"
+      ],
+      "task_guidance": "Implement logging using a secure, append-only log system.",
+      "due_on": "2026-10-01",
+      "due_baseline_on": "2026-10-01"
+    },
+    {
+      "id": "STORY-007",
+      "title": "Extract Structured Information from Documents",
+      "release": "r3",
+      "fulfills": [
+        "REQ-010"
+      ],
+      "narrative": "As a user, I want OpsPilot to extract structured information from uploaded documents, so that I can easily access relevant data.",
+      "acceptance": [
+        "Given a document is uploaded, When it is processed, Then structured information is extracted.",
+        "Given a document is uploaded, When it contains errors, Then the system flags it for review.",
+        "Trust: Document processing actions are logged."
+      ],
+      "blocked_by": [
+        "STORY-006"
+      ],
+      "owner_agent": "Document Agent",
+      "failure_paths": [
+        "Unsupported document format",
+        "Extraction errors",
+        "Document upload failure"
+      ],
+      "task_guidance": "Use Claude's document-analysis skill to extract information from documents.",
+      "due_on": "2026-10-01",
+      "due_baseline_on": "2026-10-01"
+    },
+    {
+      "id": "STORY-008",
+      "title": "Calculate Estimated ROI",
+      "release": "r3",
+      "fulfills": [
+        "REQ-009"
+      ],
+      "narrative": "As a financial analyst, I want OpsPilot to calculate estimated ROI, so that I can assess the financial impact of automation.",
+      "acceptance": [
+        "Given user assumptions are provided, When ROI is calculated, Then it shows estimated savings.",
+        "Given user assumptions are incorrect, When ROI is calculated, Then it flags potential errors.",
+        "Trust: ROI calculations are logged with assumptions."
+      ],
+      "blocked_by": [
+        "STORY-007"
+      ],
+      "owner_agent": "Finance Agent",
+      "failure_paths": [
+        "Incorrect assumptions",
+        "Calculation errors",
+        "Data input errors"
+      ],
+      "task_guidance": "Implement ROI calculation using user-provided data and assumptions.",
+      "due_on": "2026-10-01",
+      "due_baseline_on": "2026-10-01"
+    },
+    {
+      "id": "STORY-009",
+      "title": "Provide Configurable Governance Controls",
+      "release": "r4",
+      "fulfills": [
+        "REQ-015"
+      ],
+      "narrative": "As a compliance officer, I want OpsPilot to provide configurable governance controls, so that it can adapt to different jurisdictions.",
+      "acceptance": [
+        "Given a jurisdiction is selected, When governance controls are configured, Then they reflect local regulations.",
+        "Given a jurisdiction is selected, When controls are misconfigured, Then the system alerts the user.",
+        "Trust: Configuration changes are logged for audit purposes."
+      ],
+      "blocked_by": [
+        "STORY-008"
+      ],
+      "owner_agent": "Governance Agent",
+      "failure_paths": [
+        "Misconfiguration",
+        "Regulatory updates",
+        "Unauthorized configuration changes"
+      ],
+      "task_guidance": "Implement governance configuration using a modular policy framework.",
+      "due_on": "2026-10-01",
+      "due_baseline_on": "2026-10-01"
+    },
+    {
+      "id": "STORY-010",
+      "title": "Simulate Workflows Using Synthetic Data",
+      "release": "r4",
+      "fulfills": [
+        "REQ-014"
+      ],
+      "narrative": "As a system tester, I want OpsPilot to simulate workflows using synthetic data, so that I can validate system behavior without real data.",
+      "acceptance": [
+        "Given synthetic data is available, When a workflow is simulated, Then it executes as expected.",
+        "Given synthetic data is incorrect, When a workflow is simulated, Then it flags errors.",
+        "Trust: Simulation results are logged for review."
+      ],
+      "blocked_by": [
+        "STORY-009"
+      ],
+      "owner_agent": "Simulation Agent",
+      "failure_paths": [
+        "Data generation errors",
+        "Simulation timeout",
+        "Unexpected workflow behavior"
+      ],
+      "task_guidance": "Use Claude's workflow-design skill to simulate workflows with synthetic data.",
+      "due_on": "2026-10-01",
+      "due_baseline_on": "2026-10-01"
+    },
+    {
+      "id": "STORY-011",
+      "title": "Provide Dashboard for Process Analysis Results",
+      "release": "r0",
+      "fulfills": [
+        "REQ-013"
+      ],
+      "narrative": "As a data analyst, I want a dashboard to display process analysis results and automation opportunities, so that I can identify areas for improvement.",
+      "acceptance": [
+        "Given process analysis data is available, when I access the dashboard, then I see the analysis results and automation opportunities.",
+        "Given no data is available, when I access the dashboard, then I see a message indicating no data is present.",
+        "Trust: The system logs all dashboard accesses and data views for audit purposes."
+      ],
+      "blocked_by": [],
+      "owner_agent": "data_analyst",
+      "failure_paths": [
+        "Data retrieval failure",
+        "Dashboard rendering error",
+        "Unauthorized access"
+      ],
+      "task_guidance": "Create a dashboard interface that pulls data from the process analysis module and displays it to users.",
+      "due_on": "2026-10-01",
+      "due_baseline_on": "2026-10-01"
+    }
+  ],
+  "agents": [],
+  "project": {
+    "name": "OpsPilot AI — Enterprise AI Operations, Workflow & Risk Automation Platform",
+    "descriptor": "An AI agent that analyses organisational operations, identifies inefficiencies and risks, automates workflows, and measures financial and operational impact.",
+    "repo_url": "https://github.com/chukseneh/OpsPilot-AI",
+    "plan_version": 1,
+    "plan_sha256": "29a5ce2db2095339807f467ba39ea4f4fcec9f26c2d2299fe20b0e2e59580c73"
+  },
+  "schedule": {
+    "build_start": "2026-10-01",
+    "build_end": "2026-10-01",
+    "demo_day": "2026-10-08",
+    "build_weeks": 1,
+    "demo_release_key": "r0",
+    "roadmap_release_keys": [
+      "r1",
+      "r2",
+      "r3",
+      "r4"
+    ],
+    "prep": [
+      {
+        "key": "PREP-1",
+        "title": "Write the demo narrative: the problem, the one moment, the guardrail",
+        "due_on": "2026-10-02"
+      },
+      {
+        "key": "PREP-2",
+        "title": "Record a first run-through and watch it back",
+        "due_on": "2026-10-03"
+      },
+      {
+        "key": "PREP-3",
+        "title": "Build the slides — what it does, who for, the number it moves",
+        "due_on": "2026-10-05"
+      },
+      {
+        "key": "PREP-4",
+        "title": "Rehearse with one other person and take their notes",
+        "due_on": "2026-10-06"
+      },
+      {
+        "key": "PREP-5",
+        "title": "Record the final demo video",
+        "due_on": "2026-10-07"
+      },
+      {
+        "key": "PREP-6",
+        "title": "Present at Demo Day",
+        "due_on": "2026-10-08"
+      }
+    ]
+  },
+  "derived": {
+    "measures": [],
+    "guardrails": [
+      {
+        "id": "REQ-008",
+        "statement": "The system must log all actions and decisions for audit purposes."
+      }
+    ],
+    "systems": [
+      "Microsoft",
+      "Google Workspace",
+      "CRM",
+      "MCP"
+    ],
+    "roles": [
+      "operations manager",
+      "process analyst",
+      "compliance officer",
+      "IT manager",
+      "process manager",
+      "security officer",
+      "user",
+      "financial analyst",
+      "system tester",
+      "data analyst"
+    ],
+    "counts": {
+      "requirements_total": 18,
+      "requirements_by_kind": {
+        "CONSTRAINT": 3,
+        "FUNC": 14,
+        "SAFE": 1
+      },
+      "stories_total": 11,
+      "releases_total": 5,
+      "agents_total": 0,
+      "failure_paths_total": 32,
+      "agents_by_autonomy": {}
+    }
+  }
+}
