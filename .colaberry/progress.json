@@ -19,29 +19,55 @@
       "criteria": [
         {
           "text": "Given the Command Center, when it is opened, then every tab is reachable and every card drills down one level.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given sample mode, when any tab is shown, then the sample data is visibly labelled as sample.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given the Command Center, when any tab renders, then .colaberry/plan.json and .colaberry/progress.json are both committed in this repo and every tab reads its content from them at runtime rather than from hard-coded values.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given the Command Center, when any tab is shown, then .colaberry/manifest.json is committed in this repo and every tab shows how old that data is and warns when the age exceeds a week.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust — no tab shows a number, a connection or a result the project has not actually produced.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "index.html",
+        ".nojekyll",
+        "app/theme.css",
+        "app/app.css",
+        "app/main.js",
+        "app/router.js",
+        "app/data.js",
+        "app/ui.js",
+        "app/sample.js",
+        "app/ask.js",
+        "app/tabs/index.js",
+        "app/tabs/overview.js",
+        "app/tabs/outcomes.js",
+        "app/tabs/users.js",
+        "app/tabs/guardrails.js",
+        "app/tabs/systems.js",
+        "app/tabs/project.js",
+        "app/tabs/agents.js",
+        "app/tabs/knowledge.js",
+        "app/tabs/datamodel.js",
+        "knowledge/notes.json",
+        "knowledge/data-model.json",
+        ".colaberry/enrichment/STORY-000.json"
+      ],
+      "tests_added": [
+        "tests/command-center.test.mjs"
+      ],
+      "notes": "Static Command Center at the repo root; all nine tabs read .colaberry/ at runtime. Run the checks with: node --test \"tests/*.test.mjs\"",
+      "updated_at": "2026-10-01T10:06:37.447Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,

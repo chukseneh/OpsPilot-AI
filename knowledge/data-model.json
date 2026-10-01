@@ -1,0 +1,262 @@
+{
+  "schema_version": 1,
+  "status": "proposed",
+  "_how_to_use": "A starting point derived from the requirements in .colaberry/plan.json, for review before any table is created. Tables are named after what is stored, never after a vendor. The Data model tab reads this file at runtime.",
+  "entities": [
+    {
+      "name": "Person",
+      "purpose": "Someone who uses the system or is accountable for something in it.",
+      "requirements": ["REQ-006", "REQ-007", "REQ-008"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "name", "type": "text" },
+        { "name": "email", "type": "text", "notes": "unique" },
+        { "name": "role", "type": "text", "notes": "e.g. operations manager, compliance officer" },
+        { "name": "department", "type": "text" }
+      ]
+    },
+    {
+      "name": "ConnectedSource",
+      "purpose": "An outside system the platform reads from — email and documents, CRM, ticketing, or a tool server. The vendor is a value, not a table.",
+      "requirements": ["REQ-001", "REQ-002", "REQ-011"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "kind", "type": "enum", "notes": "email_documents | crm | ticketing | tool_server" },
+        { "name": "provider", "type": "text", "notes": "e.g. Microsoft 365, Google Workspace" },
+        { "name": "status", "type": "enum", "notes": "connected | not_connected | error" },
+        { "name": "last_checked_at", "type": "timestamp", "notes": "null until first checked" }
+      ]
+    },
+    {
+      "name": "BusinessProcess",
+      "purpose": "A process the organisation runs and wants analysed.",
+      "requirements": ["REQ-003", "REQ-004"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "name", "type": "text" },
+        { "name": "department", "type": "text" },
+        { "name": "owner_id", "type": "uuid", "ref": "Person" },
+        { "name": "description", "type": "text" }
+      ]
+    },
+    {
+      "name": "ProcessEvent",
+      "purpose": "One observed step of a process, gathered from a connected source.",
+      "requirements": ["REQ-003", "REQ-001", "REQ-002"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "process_id", "type": "uuid", "ref": "BusinessProcess" },
+        { "name": "source_id", "type": "uuid", "ref": "ConnectedSource" },
+        { "name": "step", "type": "text" },
+        { "name": "actor", "type": "text" },
+        { "name": "started_at", "type": "timestamp" },
+        { "name": "ended_at", "type": "timestamp" }
+      ]
+    },
+    {
+      "name": "AnalysisRun",
+      "purpose": "One run of process analysis, including what data was missing.",
+      "requirements": ["REQ-003", "REQ-013"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "process_id", "type": "uuid", "ref": "BusinessProcess" },
+        { "name": "requested_by", "type": "uuid", "ref": "Person" },
+        { "name": "started_at", "type": "timestamp" },
+        { "name": "finished_at", "type": "timestamp" },
+        { "name": "status", "type": "enum", "notes": "running | complete | incomplete_data | failed" },
+        { "name": "missing_data", "type": "json", "notes": "what the run could not find" }
+      ]
+    },
+    {
+      "name": "ProcessFinding",
+      "purpose": "An inefficiency or automation opportunity an analysis run found.",
+      "requirements": ["REQ-003", "REQ-004", "REQ-013"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "analysis_run_id", "type": "uuid", "ref": "AnalysisRun" },
+        { "name": "kind", "type": "enum", "notes": "bottleneck | duplication | automation_opportunity" },
+        { "name": "description", "type": "text" },
+        { "name": "severity", "type": "enum", "notes": "low | medium | high" }
+      ]
+    },
+    {
+      "name": "AISystem",
+      "purpose": "An AI system in the organisation's inventory.",
+      "requirements": ["REQ-006"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "name", "type": "text" },
+        { "name": "department", "type": "text" },
+        { "name": "purpose", "type": "text" },
+        { "name": "risk_level", "type": "enum", "notes": "low | medium | high | unassessed" },
+        { "name": "owner_id", "type": "uuid", "ref": "Person" },
+        { "name": "status", "type": "enum", "notes": "proposed | active | paused | retired" }
+      ]
+    },
+    {
+      "name": "RiskAssessment",
+      "purpose": "A risk or privacy assessment of one AI system, with suggested mitigations.",
+      "requirements": ["REQ-005", "REQ-016", "REQ-017"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "ai_system_id", "type": "uuid", "ref": "AISystem" },
+        { "name": "kind", "type": "enum", "notes": "risk | privacy" },
+        { "name": "assessed_by", "type": "uuid", "ref": "Person" },
+        { "name": "assessed_at", "type": "timestamp" },
+        { "name": "findings", "type": "json", "notes": "risks identified, each with a category" },
+        { "name": "mitigations", "type": "json", "notes": "suggested actions" }
+      ]
+    },
+    {
+      "name": "Jurisdiction",
+      "purpose": "A legal jurisdiction whose rules shape governance controls.",
+      "requirements": ["REQ-015"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "code", "type": "text", "notes": "e.g. UK, EU, US-CA" },
+        { "name": "name", "type": "text" }
+      ]
+    },
+    {
+      "name": "GovernanceControl",
+      "purpose": "One configurable control, set per jurisdiction.",
+      "requirements": ["REQ-015"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "jurisdiction_id", "type": "uuid", "ref": "Jurisdiction" },
+        { "name": "name", "type": "text" },
+        { "name": "setting", "type": "json" },
+        { "name": "is_valid", "type": "boolean", "notes": "false raises a misconfiguration alert" }
+      ]
+    },
+    {
+      "name": "Workflow",
+      "purpose": "A designed, automatable workflow.",
+      "requirements": ["REQ-018", "REQ-014", "REQ-007"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "name", "type": "text" },
+        { "name": "definition", "type": "json", "notes": "steps and their risk levels" },
+        { "name": "jurisdiction_id", "type": "uuid", "ref": "Jurisdiction" },
+        { "name": "created_by", "type": "uuid", "ref": "Person" }
+      ]
+    },
+    {
+      "name": "WorkflowRun",
+      "purpose": "One execution of a workflow — live, or a simulation on synthetic data.",
+      "requirements": ["REQ-014", "REQ-012"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "workflow_id", "type": "uuid", "ref": "Workflow" },
+        { "name": "mode", "type": "enum", "notes": "live | simulation" },
+        { "name": "started_at", "type": "timestamp" },
+        { "name": "status", "type": "enum", "notes": "running | complete | failed | flagged" }
+      ]
+    },
+    {
+      "name": "Agent",
+      "purpose": "A designed AI agent that can be given tasks.",
+      "requirements": ["REQ-012"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "name", "type": "text" },
+        { "name": "purpose", "type": "text" },
+        { "name": "autonomy_level", "type": "text" }
+      ]
+    },
+    {
+      "name": "AgentTask",
+      "purpose": "Work assigned to an agent within a run, including reassignment after a failure.",
+      "requirements": ["REQ-012"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "workflow_run_id", "type": "uuid", "ref": "WorkflowRun" },
+        { "name": "agent_id", "type": "uuid", "ref": "Agent" },
+        { "name": "reassigned_from_id", "type": "uuid", "ref": "AgentTask", "notes": "set when a failed agent's task moves" },
+        { "name": "status", "type": "enum", "notes": "assigned | done | failed | reassigned" },
+        { "name": "assigned_at", "type": "timestamp" }
+      ]
+    },
+    {
+      "name": "ActionRequest",
+      "purpose": "An action a workflow wants to take, with its risk level. High risk waits for a person.",
+      "requirements": ["REQ-007"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "workflow_run_id", "type": "uuid", "ref": "WorkflowRun" },
+        { "name": "action", "type": "text" },
+        { "name": "risk_level", "type": "enum", "notes": "low | high" },
+        { "name": "status", "type": "enum", "notes": "auto_executed | pending_approval | approved | rejected" }
+      ]
+    },
+    {
+      "name": "Approval",
+      "purpose": "A person's decision on a high-risk action, with their reason.",
+      "requirements": ["REQ-007"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "action_request_id", "type": "uuid", "ref": "ActionRequest" },
+        { "name": "approver_id", "type": "uuid", "ref": "Person" },
+        { "name": "decision", "type": "enum", "notes": "approved | rejected" },
+        { "name": "rationale", "type": "text" },
+        { "name": "decided_at", "type": "timestamp" }
+      ]
+    },
+    {
+      "name": "Document",
+      "purpose": "An uploaded document such as an invoice or contract.",
+      "requirements": ["REQ-010"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "kind", "type": "enum", "notes": "invoice | contract | other" },
+        { "name": "uploaded_by", "type": "uuid", "ref": "Person" },
+        { "name": "uploaded_at", "type": "timestamp" },
+        { "name": "storage_ref", "type": "text", "notes": "where the file lives, never the file itself" },
+        { "name": "status", "type": "enum", "notes": "processing | extracted | flagged_for_review" }
+      ]
+    },
+    {
+      "name": "ExtractedField",
+      "purpose": "One piece of structured information pulled from a document.",
+      "requirements": ["REQ-010"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "document_id", "type": "uuid", "ref": "Document" },
+        { "name": "name", "type": "text", "notes": "e.g. invoice_total, counterparty" },
+        { "name": "value", "type": "text" },
+        { "name": "confidence", "type": "number" },
+        { "name": "flagged", "type": "boolean" }
+      ]
+    },
+    {
+      "name": "RoiScenario",
+      "purpose": "An ROI estimate and the assumptions it was calculated from.",
+      "requirements": ["REQ-009"],
+      "fields": [
+        { "name": "id", "type": "uuid", "notes": "primary key" },
+        { "name": "created_by", "type": "uuid", "ref": "Person" },
+        { "name": "assumptions", "type": "json" },
+        { "name": "estimated_savings", "type": "number" },
+        { "name": "warnings", "type": "json", "notes": "assumptions flagged as likely wrong" },
+        { "name": "calculated_at", "type": "timestamp" }
+      ]
+    },
+    {
+      "name": "AuditEvent",
+      "purpose": "Append-only record of every action and decision. Rows are never updated or deleted; each carries the hash of the one before.",
+      "requirements": ["REQ-008"],
+      "fields": [
+        { "name": "id", "type": "bigint", "notes": "primary key, monotonic" },
+        { "name": "occurred_at", "type": "timestamp" },
+        { "name": "actor_type", "type": "enum", "notes": "person | agent | system" },
+        { "name": "actor_id", "type": "text" },
+        { "name": "action", "type": "text" },
+        { "name": "entity_type", "type": "text" },
+        { "name": "entity_id", "type": "text" },
+        { "name": "rationale", "type": "text", "notes": "required for decisions" },
+        { "name": "prev_hash", "type": "text" },
+        { "name": "hash", "type": "text" }
+      ]
+    }
+  ]
+}

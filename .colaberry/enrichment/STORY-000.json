@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "1",
+  "projectId": "3704f65e-d372-4085-b821-5b5495f688d0",
+  "storyId": "STORY-000",
+  "projectTruthBaseRevision": 1,
+  "observedAt": "2026-10-01T10:08:00.000Z",
+  "sourceCommitSha": "9ffd9dfde38053a4571bc322bebc0d6fa47229ad",
+  "factProposals": [
+    {
+      "dimension": "constraints",
+      "value": "The Command Center is a static page served from the repo, so it cannot hold a secret: it cannot call an AI model or check an integration itself.",
+      "evidence": "app/ask.js"
+    },
+    {
+      "dimension": "unknowns",
+      "value": "Whether Microsoft, Google Workspace, CRM and MCP are connected cannot be determined from the repo; every system shows as not checked until the running system reports.",
+      "evidence": "app/tabs/systems.js"
+    },
+    {
+      "dimension": "unknowns",
+      "value": "Two must-have requirements have no fulfilling story: REQ-002 (CRM and ticketing) and REQ-011 (MCP servers). Should-haves REQ-016, REQ-017 and REQ-018 have none either.",
+      "evidence": "app/tabs/knowledge.js"
+    },
+    {
+      "dimension": "data",
+      "value": "A proposed data model of 20 tables derived from the requirements, including an append-only, hash-chained AuditEvent table for REQ-008. Not yet created.",
+      "evidence": "knowledge/data-model.json"
+    }
+  ],
+  "decisions": [
+    {
+      "statement": "Build the Command Center as a static site with no build step, entered from index.html at the repo root.",
+      "rationale": "GitHub Pages serves only the root or docs/, and docs/ is rewritten by the platform on every sync.",
+      "evidence": "index.html"
+    },
+    {
+      "statement": "Read every tab's content from .colaberry/ at runtime through one loader.",
+      "rationale": "The files are rewritten on each sync; a typed-out copy would go stale.",
+      "evidence": "app/data.js"
+    },
+    {
+      "statement": "Answer Knowledge base questions by fixed rules over page data, with no AI model.",
+      "rationale": "A public static page cannot hold an API key; rules can cite their source and refuse what they cannot answer.",
+      "evidence": "app/ask.js"
+    },
+    {
+      "statement": "Ship a .nojekyll file at the repo root.",
+      "rationale": "GitHub Pages otherwise skips dot-folders, so .colaberry/ would not be served.",
+      "evidence": ".nojekyll"
+    },
+    {
+      "statement": "Default to Real mode; Sample must be switched on and is bannered on every screen.",
+      "rationale": "Nobody should demo sample data by accident.",
+      "evidence": "app/main.js"
+    }
+  ],
+  "limitations": [
+    {
+      "statement": "The question panel only answers questions that match its rules; anything else gets an explicit cannot-answer reply.",
+      "evidence": "app/ask.js"
+    },
+    {
+      "statement": "The AI agents tab lists story owners, labelled as owners, because plan.agents is empty.",
+      "evidence": "app/tabs/agents.js"
+    },
+    {
+      "statement": "All data is as of the last sync (manifest.generated_at); nothing on the page is live.",
+      "evidence": "app/data.js"
+    },
+    {
+      "statement": "Points are shown exactly as progress.json reports them, with a note when no story is verified yet.",
+      "evidence": "app/tabs/overview.js"
+    }
+  ],
+  "demonstrationEvidence": [
+    {
+      "kind": "test",
+      "ref": "tests/command-center.test.mjs"
+    }
+  ],
+  "measurementEvents": []
+}

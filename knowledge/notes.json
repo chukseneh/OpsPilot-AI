@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "_how_to_use": "Yours to edit. The Knowledge base tab reads this file at runtime. Add a decision whenever you make a choice someone will later ask about; add a note for anything else worth remembering. Dates are YYYY-MM-DD.",
+  "decisions": [
+    {
+      "id": "DEC-001",
+      "date": "2026-10-01",
+      "statement": "The Command Center is a static site with no build step, entered from index.html at the repo root.",
+      "rationale": "GitHub Pages on a free public repo serves only the root or docs/, and docs/ is rewritten by the platform on every sync.",
+      "evidence": "index.html"
+    },
+    {
+      "id": "DEC-002",
+      "date": "2026-10-01",
+      "statement": "Every tab reads the .colaberry/ files at runtime through one loader; no plan content is typed into a component.",
+      "rationale": "The files are rewritten on each sync, so a typed-out copy would silently go stale.",
+      "evidence": "app/data.js"
+    },
+    {
+      "id": "DEC-003",
+      "date": "2026-10-01",
+      "statement": "The Knowledge base question panel answers from page data by fixed rules, with no AI model behind it.",
+      "rationale": "A public static page cannot hold an API key. Rules can cite their source tab and say plainly when they cannot answer.",
+      "evidence": "app/ask.js"
+    },
+    {
+      "id": "DEC-004",
+      "date": "2026-10-01",
+      "statement": "A .nojekyll file sits at the repo root.",
+      "rationale": "Without it GitHub Pages skips dot-folders, so .colaberry/ would not be served and the hosted page would load no data.",
+      "evidence": ".nojekyll"
+    },
+    {
+      "id": "DEC-005",
+      "date": "2026-10-01",
+      "statement": "Real is the default mode; Sample must be switched on and is bannered on every screen.",
+      "rationale": "Nobody should demo sample data by accident.",
+      "evidence": "app/main.js"
+    },
+    {
+      "id": "DEC-006",
+      "date": "2026-10-01",
+      "statement": "The AI agents tab lists story owners, labelled as owners, while plan.agents is empty.",
+      "rationale": "The plan carries no scoped agent roster yet; presenting a job title as an AI agent would overstate the design.",
+      "evidence": "app/tabs/agents.js"
+    }
+  ],
+  "notes": []
+}

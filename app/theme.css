@@ -1,0 +1,66 @@
+/*
+ * Palette — the ONE place colours are defined. No brand colours have been
+ * chosen yet, so this is a neutral set; rebranding is an edit to this file only.
+ * Status colours: grey (--unknown) is the default for anything not yet checked.
+ */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #eceef2;
+  --border: #d7dbe1;
+  --text: #1d222a;
+  --text-muted: #5a6472;
+  --accent: #2f5d8a;
+  --accent-soft: #e3ecf5;
+  --ok: #2e7d4f;
+  --warn: #9a5800;
+  --warn-bg: #fff3dc;
+  --bad: #b3261e;
+  --unknown: #8a929c;
+  --sample: #6b3fa0;
+  --sample-bg: #f2ebfb;
+
+  --radius: 10px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14171c;
+    --surface: #1c2027;
+    --surface-2: #252a33;
+    --border: #343a45;
+    --text: #e6e9ee;
+    --text-muted: #9aa3b0;
+    --accent: #7fb0e0;
+    --accent-soft: #22303f;
+    --ok: #6cc28f;
+    --warn: #f0b660;
+    --warn-bg: #3a2c14;
+    --bad: #f28b82;
+    --unknown: #8a929c;
+    --sample: #c7a4f0;
+    --sample-bg: #2c2240;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #14171c;
+  --surface: #1c2027;
+  --surface-2: #252a33;
+  --border: #343a45;
+  --text: #e6e9ee;
+  --text-muted: #9aa3b0;
+  --accent: #7fb0e0;
+  --accent-soft: #22303f;
+  --ok: #6cc28f;
+  --warn: #f0b660;
+  --warn-bg: #3a2c14;
+  --bad: #f28b82;
+  --unknown: #8a929c;
+  --sample: #c7a4f0;
+  --sample-bg: #2c2240;
+  color-scheme: dark;
+}
