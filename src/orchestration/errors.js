@@ -35,6 +35,10 @@ export class RateLimitedError extends OrchestrationError {
 // No healthy agent is left that can do a task. The operation cannot finish.
 export class NoAgentAvailableError extends OrchestrationError {}
 
+// An operation id was reused with a different set of tasks. Refused, because
+// returning or resuming the old work would answer a question nobody asked.
+export class OperationConflictError extends OrchestrationError {}
+
 export function classify(err) {
   if (err instanceof NetworkError || err instanceof RateLimitedError) return 'retry';
   return 'reassign';

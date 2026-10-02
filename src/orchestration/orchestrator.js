@@ -12,16 +12,37 @@
 //
 // Running the same operation twice is safe: finished task results are saved by
 // operation id, a completed operation is returned from the store without calling
-// any agent, and a part-finished one only redoes the unfinished tasks. Agents also
-// get an idempotencyKey (operationId:taskId) to guard their own side effects.
+// any agent, a part-finished one only redoes the unfinished tasks, and a call for
+// an operation that is still running joins that run instead of starting another.
+// Reusing an id with different tasks is refused (OperationConflictError). Agents
+// also get an idempotencyKey (operationId:taskId) to guard their own side effects.
+// Limit: "already running" is known only inside one process; two processes
+// sharing a store would need a lock, which nothing here provides yet.
 //
 // If the audit log (or the result store) cannot be written, every in-flight task
 // is cancelled and runOperation rejects: nothing carries on unrecorded.
 
-import { classify, NoAgentAvailableError, TimeoutError } from './errors.js';
+import { createHash } from 'node:crypto';
+
+import { classify, NoAgentAvailableError, TimeoutError, RateLimitedError, OperationConflictError } from './errors.js';
 import { CAPABILITIES } from './agents.js';
 
 const ORCHESTRATOR = { type: 'system', id: 'orchestrator' };
+const UNKNOWN_REQUESTER = { type: 'system', id: 'unknown-requester' };
+
+// JSON with object keys sorted, so {a,b} and {b,a} fingerprint the same.
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${stableJson(value[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+// What an operation asks for. Same id + same fingerprint = the same operation.
+const fingerprintOf = (tasks) => createHash('sha256')
+  .update(stableJson(tasks.map((t) => ({ id: t.id, capability: t.capability, input: t.input ?? null }))))
+  .digest('hex');
 
 const defaultSleep = (ms, signal) => new Promise((resolve, reject) => {
   if (signal.aborted) { reject(signal.reason); return; }
@@ -52,13 +73,20 @@ export function createOrchestrator({
 }) {
   // Tasks assigned to each agent over this orchestrator's life — used to spread work.
   const assignedCount = new Map();
+  // Operations running right now in this process: operationId → { promise, fingerprint }.
+  const inFlight = new Map();
 
   function retryDelay(err, attempt) {
-    if (err?.name === 'RateLimitedError' && err.retryAfterMs != null) return Math.min(err.retryAfterMs, maxRetryAfterMs);
+    // instanceof, not a name check: a connector's own subclass (e.g. a throttling
+    // error extending RateLimitedError) must still get the wait the service asked for.
+    if (err instanceof RateLimitedError && err.retryAfterMs != null) return Math.min(err.retryAfterMs, maxRetryAfterMs);
     return Math.min(backoffBaseMs * 2 ** (attempt - 1), backoffMaxMs);
   }
 
-  function validate(operationId, tasks) {
+  const validActor = (a) => typeof a?.type === 'string' && a.type.trim() !== '' && typeof a?.id === 'string' && a.id.trim() !== '';
+
+  function validate(operationId, tasks, requestedBy) {
+    if (requestedBy !== undefined && !validActor(requestedBy)) return 'requestedBy must have a non-empty string type and id';
     if (typeof operationId !== 'string' || !operationId.trim()) return 'operationId must be a non-empty string';
     if (!Array.isArray(tasks) || !tasks.length) return 'an operation needs at least one task';
     const ids = new Set();
@@ -71,20 +99,42 @@ export function createOrchestrator({
     return null;
   }
 
-  async function runOperation({ operationId, tasks, requestedBy }) {
-    const actor = requestedBy ?? { type: 'system', id: 'unknown-requester' };
-    const problem = validate(operationId, tasks);
+  // The public entry point: checks the request, then either joins a run already in
+  // progress, returns a saved result, or starts a new (or resumed) run.
+  async function runOperation({ operationId, tasks, requestedBy } = {}) {
+    const problem = validate(operationId, tasks, requestedBy);
     if (problem) {
       audit.append({
-        correlationId: typeof operationId === 'string' && operationId ? operationId : 'invalid-request',
-        actor, action: 'operation.rejected', rationale: problem,
+        correlationId: typeof operationId === 'string' && operationId.trim() ? operationId : 'invalid-request',
+        actor: validActor(requestedBy) ? requestedBy : UNKNOWN_REQUESTER,
+        action: 'operation.rejected', rationale: problem,
       });
       throw new TypeError(`Operation rejected: ${problem}`);
     }
+    const actor = requestedBy ?? UNKNOWN_REQUESTER;
+    const fingerprint = fingerprintOf(tasks);
 
-    const log = (action, fields = {}) => audit.append({ correlationId: operationId, actor: ORCHESTRATOR, action, ...fields });
+    const conflict = (rationale) => {
+      audit.append({ correlationId: operationId, actor, action: 'operation.rejected', rationale });
+      return new OperationConflictError(`Operation ${operationId} rejected: ${rationale}`);
+    };
+
+    // Already running in this process: hand back the same in-progress result, so
+    // a retry from the caller can never run the tasks a second time.
+    const running = inFlight.get(operationId);
+    if (running) {
+      if (running.fingerprint !== fingerprint) throw conflict('This id is already running with a different set of tasks.');
+      audit.append({
+        correlationId: operationId, actor, action: 'operation.joined',
+        rationale: 'Already running; waiting for the same run instead of starting a second one.',
+      });
+      return running.promise;
+    }
 
     const saved = store.get(operationId);
+    if (saved?.fingerprint && saved.fingerprint !== fingerprint) {
+      throw conflict('This id was used before with a different set of tasks; use a new operation id.');
+    }
     if (saved?.status === 'completed') {
       audit.append({
         correlationId: operationId, actor, action: 'operation.replayed',
@@ -93,12 +143,24 @@ export function createOrchestrator({
       return { ...saved.result, replayed: true };
     }
 
+    const promise = execute({ operationId, tasks, actor, fingerprint, saved });
+    inFlight.set(operationId, { promise, fingerprint });
+    // then(cleanup, cleanup), not finally(): finally() would return a second promise
+    // that rejects unhandled whenever the run fails.
+    const cleanup = () => { inFlight.delete(operationId); };
+    promise.then(cleanup, cleanup);
+    return promise;
+  }
+
+  async function execute({ operationId, tasks, actor, fingerprint, saved }) {
+    const log = (action, fields = {}) => audit.append({ correlationId: operationId, actor: ORCHESTRATOR, action, ...fields });
+
     audit.append({
       correlationId: operationId, actor, action: 'operation.started',
       detail: { tasks: tasks.map((t) => ({ id: t.id, capability: t.capability })), resumed: Boolean(saved) },
     });
 
-    const record = { status: 'running', tasks: { ...(saved?.tasks ?? {}) } };
+    const record = { status: 'running', fingerprint, tasks: { ...(saved?.tasks ?? {}) } };
     store.put(operationId, record);
 
     // Cancels every in-flight task if something we cannot work without fails.
@@ -210,7 +272,7 @@ export function createOrchestrator({
           registry.markUnhealthy(agent.id, `${failure.name}: ${failure.message}`);
           log('agent.marked_unhealthy', {
             subject: agent.id,
-            rationale: `Failed task ${task.id} with ${failure.name}; no further work goes to it in this run.`,
+            rationale: `Failed task ${task.id} with ${failure.name}; kept out of rotation for the rest of this orchestrator's life.`,
             detail: { error: failure },
           });
         }
@@ -245,7 +307,7 @@ export function createOrchestrator({
         failed: taskResults.filter((t) => t.status === 'failed').map((t) => t.id),
       },
     });
-    store.put(operationId, { status, tasks: record.tasks, result });
+    store.put(operationId, { status, fingerprint, tasks: record.tasks, result });
     return result;
   }
 

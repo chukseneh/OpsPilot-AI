@@ -283,6 +283,69 @@ test('re-running a part-failed operation only redoes the unfinished task (file s
   assert.equal(createAuditLog({ file: join(dir, 'audit.jsonl') }).verify().ok, true);
 });
 
+test('two calls for the same operation at once run it only once', async () => {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const p = scripted('process-1', ['process'], async () => { await gate; return { ok: true }; });
+  const { orchestrator, actions } = setup([p], { timeoutMs: 5000 });
+  const op = { operationId: 'op-dup', requestedBy: manager, tasks: [{ id: 't', capability: 'process' }] };
+
+  const first = orchestrator.runOperation(op);
+  const second = orchestrator.runOperation(op); // the caller retries while the first is still working
+  release();
+  const [a, b] = await Promise.all([first, second]);
+
+  assert.equal(p.calls.length, 1, 'the agent ran once');
+  assert.equal(a, b, 'both callers get the same result');
+  assert.ok(actions().includes('operation.joined'));
+  assert.equal(actions().filter((x) => x === 'operation.started').length, 1);
+});
+
+test('reusing an operation id with different tasks is refused, and the saved result is untouched', async () => {
+  const p = scripted('process-1', ['process']);
+  const { orchestrator, audit } = setup([p]);
+  const original = { operationId: 'op-reuse', requestedBy: manager, tasks: [{ id: 't', capability: 'process', input: { a: 1, b: 2 } }] };
+  await orchestrator.runOperation(original);
+
+  // Same tasks with keys in another order count as the same operation: replayed.
+  const same = await orchestrator.runOperation({ ...original, tasks: [{ id: 't', capability: 'process', input: { b: 2, a: 1 } }] });
+  assert.equal(same.replayed, true);
+
+  await assert.rejects(
+    orchestrator.runOperation({ ...original, tasks: [{ id: 't', capability: 'process', input: { a: 99 } }] }),
+    (err) => err.name === 'OperationConflictError',
+  );
+  await assert.rejects(
+    orchestrator.runOperation({ ...original, tasks: [...original.tasks, { id: 'extra', capability: 'process' }] }),
+    /different set of tasks/,
+  );
+  assert.equal(p.calls.length, 1);
+  assert.equal(audit.readAll().filter((e) => e.action === 'operation.rejected').length, 2);
+  assert.equal((await orchestrator.runOperation(original)).replayed, true, 'the original still replays');
+});
+
+test("a connector's own rate-limit subclass still gets the wait the service asked for", async () => {
+  class GraphThrottledError extends RateLimitedError {}
+  const throttled = scripted('finance-1', ['finance'], (n) => {
+    if (n === 1) throw new GraphThrottledError('throttled', { retryAfterMs: 5000 });
+    return { ok: true };
+  });
+  const { orchestrator, waits } = setup([throttled]);
+  await orchestrator.runOperation({ operationId: 'op-sub', requestedBy: manager, tasks: [{ id: 't', capability: 'finance' }] });
+  assert.deepEqual(waits, [5000]);
+});
+
+test('a malformed requester gets a clear bad-request error, not a misleading audit failure', async () => {
+  const { orchestrator, audit } = setup([scripted('process-1', ['process'])]);
+  await assert.rejects(
+    orchestrator.runOperation({ operationId: 'op-who', requestedBy: { id: 'bob' }, tasks: [{ id: 't', capability: 'process' }] }),
+    (err) => err instanceof TypeError && /requestedBy/.test(err.message),
+  );
+  const [entry] = audit.readAll();
+  assert.equal(entry.action, 'operation.rejected');
+  assert.equal(entry.actor.id, 'unknown-requester');
+});
+
 // ---- Trust: audit is not optional ----
 
 test('if the audit log cannot be written, in-flight work is cancelled and the operation rejects', async () => {

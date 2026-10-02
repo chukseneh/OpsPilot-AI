@@ -52,6 +52,11 @@
       "statement": "Save task results by operation id so a completed operation is replayed and a part-finished one resumes without redoing finished tasks; pass agents an idempotencyKey of operationId:taskId.",
       "rationale": "Every side effect must be idempotent; re-running must not redo work.",
       "evidence": "src/orchestration/resultStore.js"
+    },
+    {
+      "statement": "Refuse an operation id reused with a different set of tasks (compared by a fingerprint of task ids, capabilities and inputs), and let a call for a still-running operation join that run.",
+      "rationale": "Found in code review: returning or resuming old work for a changed request gives a wrong answer, and a caller retry during a run would otherwise duplicate every unfinished task.",
+      "evidence": "src/orchestration/orchestrator.js"
     }
   ],
   "limitations": [
@@ -70,6 +75,10 @@
     {
       "statement": "The hash chain detects edits and removals anywhere except the end: deleting the last entries leaves a valid chain. Detecting that needs the latest hash anchored outside the file (STORY-006).",
       "evidence": "src/audit/auditLog.js"
+    },
+    {
+      "statement": "A second call for an operation that is still running joins the first run, but only within one process; two processes sharing a result store could both run it, as nothing provides a cross-process lock yet.",
+      "evidence": "src/orchestration/orchestrator.js"
     },
     {
       "statement": "The file result store rewrites one JSON file per update, which suits a single process and modest volumes, not a shared service.",
