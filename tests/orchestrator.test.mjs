@@ -38,7 +38,7 @@ function setup(agents, options = {}) {
   const audit = options.audit ?? createAuditLog({ file: join(tempDir(), 'audit.jsonl') });
   const waits = [];
   const orchestrator = createOrchestrator({
-    registry: createRegistry(agents),
+    registry: createRegistry(agents, options.registry),
     audit,
     store: options.store ?? createMemoryResultStore(),
     timeoutMs: options.timeoutMs ?? 200,
@@ -344,6 +344,105 @@ test('a malformed requester gets a clear bad-request error, not a misleading aud
   const [entry] = audit.readAll();
   assert.equal(entry.action, 'operation.rejected');
   assert.equal(entry.actor.id, 'unknown-requester');
+});
+
+// ---- Recovery: failed agents get a trial task after a cooldown ----
+
+function clock() {
+  let t = 0;
+  return { now: () => t, advance: (ms) => { t += ms; } };
+}
+const oneTask = (operationId, capability = 'process', input) => ({
+  operationId, requestedBy: manager, tasks: [{ id: 't', capability, input }],
+});
+
+test('a failed agent stays out during its cooldown, then recovers after one successful trial task', async () => {
+  const c = clock();
+  const flaky = scripted('process-1', ['process'], (n) => {
+    if (n === 1) throw new AgentUnavailableError('restarting');
+    return { ok: true };
+  });
+  const { orchestrator, audit } = setup([flaky], { registry: { cooldownMs: 1000, now: c.now } });
+
+  assert.equal((await orchestrator.runOperation(oneTask('op-r1'))).status, 'failed');
+  c.advance(999);
+  assert.equal((await orchestrator.runOperation(oneTask('op-r2'))).status, 'failed', 'still cooling down');
+  assert.equal(flaky.calls.length, 1, 'not called during the cooldown');
+
+  c.advance(1);
+  assert.equal((await orchestrator.runOperation(oneTask('op-r3'))).status, 'completed');
+  assert.equal((await orchestrator.runOperation(oneTask('op-r4'))).status, 'completed');
+
+  const entries = audit.readAll();
+  const trial = entries.find((e) => e.correlationId === 'op-r3' && e.action === 'task.assigned');
+  assert.equal(trial.detail.probe, true);
+  assert.match(trial.rationale, /single trial task/);
+  assert.ok(entries.some((e) => e.correlationId === 'op-r3' && e.action === 'agent.recovered'));
+  const after = entries.find((e) => e.correlationId === 'op-r4' && e.action === 'task.assigned');
+  assert.equal(after.detail.probe, false, 'back in normal rotation');
+  assert.match(entries.find((e) => e.action === 'agent.marked_unhealthy').rationale, /out of rotation for 1 s, then gets one trial task/);
+});
+
+test('a failed trial task restarts the cooldown, and the task itself moves to another agent', async () => {
+  const c = clock();
+  const sick = scripted('process-1', ['process'], (n) => {
+    if (n <= 2) throw new AgentUnavailableError('still down');
+    return { ok: true };
+  });
+  const spare = scripted('process-2', ['process'], (n) => {
+    if (n === 1) throw new AgentUnavailableError('spare down at first');
+    return { ok: true };
+  });
+  const { orchestrator, audit } = setup([sick, spare], { registry: { cooldownMs: 1000, now: c.now } });
+
+  await orchestrator.runOperation(oneTask('op-p1')); // both fail; both out at t=0
+  c.advance(1000);
+  const trial = await orchestrator.runOperation(oneTask('op-p2')); // both on trial; process-1 fails its trial
+  assert.equal(trial.status, 'completed', 'the task still finished, on the other agent');
+  assert.ok(audit.readAll().some((e) => e.action === 'agent.probe_failed' && e.subject === 'process-1'));
+
+  c.advance(500);
+  const busy = await orchestrator.runOperation({ ...oneTask('op-p3'), tasks: [{ id: 'a', capability: 'process' }, { id: 'b', capability: 'process' }] });
+  assert.ok(busy.tasks.every((t) => t.agentId !== 'process-1'), 'process-1 is cooling down again');
+
+  c.advance(500);
+  await orchestrator.runOperation(oneTask('op-p4'));
+  assert.ok(audit.readAll().some((e) => e.action === 'agent.recovered' && e.subject === 'process-1'));
+});
+
+test('only one trial task runs on a recovering agent at a time', async () => {
+  const c = clock();
+  const flaky = scripted('process-1', ['process'], (n) => {
+    if (n === 1) throw new AgentUnavailableError('down');
+    return { ok: true };
+  });
+  const { orchestrator, audit } = setup([flaky], { registry: { cooldownMs: 1000, now: c.now } });
+  await orchestrator.runOperation(oneTask('op-o1'));
+  c.advance(1000);
+
+  const result = await orchestrator.runOperation({
+    ...oneTask('op-o2'), tasks: [{ id: 'a', capability: 'process' }, { id: 'b', capability: 'process' }],
+  });
+  assert.deepEqual(result.tasks.map((t) => t.status), ['completed', 'failed']);
+  assert.equal(flaky.calls.length, 2, 'one call in op-o1, one trial in op-o2');
+  assert.equal(audit.readAll().filter((e) => e.correlationId === 'op-o2' && e.detail?.probe === true).length, 1);
+});
+
+test('one bad task no longer takes a capability offline for good', async () => {
+  // The case the code review raised: input that makes every finance agent crash.
+  const c = clock();
+  const behaviour = (_n, task) => {
+    if (task.input?.poison) throw new TypeError('cannot handle this input');
+    return { ok: true };
+  };
+  const f1 = scripted('finance-1', ['finance'], behaviour);
+  const f2 = scripted('finance-2', ['finance'], behaviour);
+  const { orchestrator } = setup([f1, f2], { registry: { cooldownMs: 1000, now: c.now } });
+
+  assert.equal((await orchestrator.runOperation(oneTask('op-bad', 'finance', { poison: true }))).status, 'failed');
+  assert.equal((await orchestrator.runOperation(oneTask('op-next', 'finance'))).status, 'failed', 'both are cooling down');
+  c.advance(1000);
+  assert.equal((await orchestrator.runOperation(oneTask('op-later', 'finance'))).status, 'completed');
 });
 
 // ---- Trust: audit is not optional ----

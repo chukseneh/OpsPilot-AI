@@ -57,6 +57,11 @@
       "statement": "Refuse an operation id reused with a different set of tasks (compared by a fingerprint of task ids, capabilities and inputs), and let a call for a still-running operation join that run.",
       "rationale": "Found in code review: returning or resuming old work for a changed request gives a wrong answer, and a caller retry during a run would otherwise duplicate every unfinished task.",
       "evidence": "src/orchestration/orchestrator.js"
+    },
+    {
+      "statement": "A failed agent is out of rotation for a cooldown (30 s by default), then gets one trial task at a time; success puts it back in rotation, failure restarts the cooldown, and a failed trial's task moves to another agent.",
+      "rationale": "Without it, one task that crashes every agent of a capability took that capability offline until a restart (raised in code review).",
+      "evidence": "src/orchestration/agents.js"
     }
   ],
   "limitations": [
@@ -65,7 +70,7 @@
       "evidence": "src/demo/standInAgents.js"
     },
     {
-      "statement": "An agent taken out of rotation stays out for the life of that orchestrator; there is no automatic recovery probe.",
+      "statement": "Agent health (who is out of rotation, cooldowns, trial slots) lives in memory: a restart puts every agent back in rotation.",
       "evidence": "src/orchestration/agents.js"
     },
     {

@@ -143,17 +143,40 @@ function checkOperation({ op, result, entries, calls, agentsById, seed }) {
   }
 }
 
+// Returns how many trial tasks (probes) the log shows, so callers can check some happened.
 function checkLog(entries, seed) {
   for (const e of entries) {
     assert.ok(!/undefined/.test(e.rationale ?? ''), `seed ${seed}: unreadable rationale in #${e.seq} ${e.action}: ${e.rationale}`);
   }
-  // Nothing is assigned to an agent after it has been marked unhealthy.
-  const outAt = new Map();
+  // An agent that is out of rotation only receives work as a trial task, at most
+  // one trial runs per agent at a time, and every trial ends in a verdict.
+  const out = new Map(); // agent → seq it went out
+  const probing = new Map(); // agent → seq of its running trial
+  let probes = 0;
   for (const e of entries) {
-    if (e.action === 'agent.marked_unhealthy') outAt.set(e.subject, e.seq);
+    const fail = (msg) => assert.fail(`seed ${seed}: #${e.seq} ${e.action} ${e.subject ?? ''}: ${msg}`);
+    if (e.action === 'agent.marked_unhealthy') {
+      if (out.has(e.subject)) fail('marked unhealthy twice without recovering');
+      out.set(e.subject, e.seq);
+    }
+    if (e.action === 'agent.recovered' || e.action === 'agent.probe_failed') {
+      if (!probing.has(e.subject)) fail('verdict without a running trial');
+      probing.delete(e.subject);
+      if (e.action === 'agent.recovered') out.delete(e.subject);
+    }
     const to = e.action === 'task.assigned' ? e.detail.agentId : e.action === 'task.reassigned' ? e.detail.to : null;
-    if (to && outAt.has(to)) assert.fail(`seed ${seed}: #${e.seq} assigned work to ${to} after it was marked unhealthy at #${outAt.get(to)}`);
+    if (!to) continue;
+    if (out.has(to)) {
+      if (e.detail.probe !== true) fail(`work sent to ${to}, out of rotation since #${out.get(to)}, without a trial`);
+      if (probing.has(to)) fail(`second trial on ${to} while trial #${probing.get(to)} is still running`);
+      probing.set(to, e.seq);
+      probes += 1;
+    } else if (e.detail.probe === true) {
+      fail(`trial task sent to ${to}, which is not out of rotation`);
+    }
   }
+  assert.equal(probing.size, 0, `seed ${seed}: trials never finished: ${[...probing.keys()].join(', ')}`);
+  return probes;
 }
 
 async function withRejectionWatch(fn) {
@@ -217,6 +240,35 @@ for (const seed of [1, 7, 42]) {
       const entries = audit.readAll();
       ops.forEach((op, i) => checkOperation({ op, result: results[i], entries, calls, agentsById, seed }));
       checkLog(entries, seed);
+      assert.equal(audit.verify().ok, true);
+    });
+  });
+
+  test(`stress C (seed ${seed}): shared agents with a 5 ms cooldown, so failed agents recover under load`, { timeout: 60000 }, async () => {
+    await withRejectionWatch(async () => {
+      const random = rng(seed * 7919);
+      const audit = createAuditLog({ file: join(mkdtempSync(join(tmpdir(), 'stress-')), 'audit.jsonl') });
+      const calls = new Map();
+      const agents = makeAgents(random, calls);
+      const agentsById = new Map(agents.map((a) => [a.id, a]));
+      const orchestrator = createOrchestrator({
+        registry: createRegistry(agents, { cooldownMs: 5 }), audit, store: createMemoryResultStore(),
+        timeoutMs: TIMEOUT_MS, maxRetries: MAX_RETRIES, sleep: async () => {},
+      });
+      // Three waves, so agents knocked out early come due for trials later.
+      const results = [];
+      const ops = [];
+      for (let wave = 0; wave < 3; wave += 1) {
+        const batch = Array.from({ length: 40 }, (_, i) => randomOperation(random, wave * 100 + i));
+        ops.push(...batch);
+        results.push(...await Promise.all(batch.map((op) => orchestrator.runOperation(op))));
+        await new Promise((r) => setTimeout(r, 10)); // let cooldowns expire between waves
+      }
+      const entries = audit.readAll();
+      ops.forEach((op, i) => checkOperation({ op, result: results[i], entries, calls, agentsById, seed }));
+      const probes = checkLog(entries, seed);
+      assert.ok(probes > 0, `seed ${seed}: no trial task happened, so recovery was not exercised`);
+      assert.ok(entries.some((e) => e.action === 'agent.recovered'), `seed ${seed}: no agent recovered`);
       assert.equal(audit.verify().ok, true);
     });
   });

@@ -6,7 +6,9 @@
 //   2. calls it with a timeout, retrying network failures and rate limits a capped
 //      number of times on the SAME agent (errors.js decides which errors retry);
 //   3. if the agent still fails, takes it out of rotation and gives the task to
-//      ANOTHER healthy agent with the same capability — and says why in the log;
+//      ANOTHER healthy agent with the same capability — and says why in the log.
+//      After a cooldown the failed agent gets one trial task; success puts it back
+//      in rotation, failure restarts the cooldown (see createRegistry);
 //   4. if no such agent is left, fails that task cleanly. It never loops forever:
 //      each agent is tried at most once per task, and agents are finite.
 //
@@ -236,25 +238,43 @@ export function createOrchestrator({
         const agent = candidates.reduce((best, a) => ((assignedCount.get(a.id) ?? 0) < (assignedCount.get(best.id) ?? 0) ? a : best));
         assignedCount.set(agent.id, (assignedCount.get(agent.id) ?? 0) + 1);
 
-        if (previousFailure) {
-          log('task.reassigned', {
-            subject: task.id,
-            rationale: `${previousFailure.agentId} failed (${previousFailure.error.name}); moved to ${agent.id}, the least-loaded healthy ${task.capability} agent.`,
-            detail: { from: previousFailure.agentId, to: agent.id, triedAgents: [...triedAgents] },
-          });
-        } else {
-          log('task.assigned', {
-            subject: task.id,
-            rationale: `${agent.id} is the least-loaded healthy ${task.capability} agent.`,
-            detail: { agentId: agent.id },
-          });
-        }
+        // No await between available() and here, so no other task can claim the
+        // same trial slot in between.
+        const probe = registry.isProbeCandidate(agent.id);
+        if (probe) registry.beginProbe(agent.id);
+        const why = probe
+          ? `${agent.id} has finished its cooldown and gets this as a single trial task.`
+          : `${agent.id} is the least-loaded healthy ${task.capability} agent.`;
 
-        const result = await attemptOnAgent(agent, task);
+        let result;
+        try {
+          if (previousFailure) {
+            log('task.reassigned', {
+              subject: task.id,
+              rationale: `${previousFailure.agentId} failed (${previousFailure.error.name}); moved to ${agent.id}. ${why}`,
+              detail: { from: previousFailure.agentId, to: agent.id, triedAgents: [...triedAgents], probe },
+            });
+          } else {
+            log('task.assigned', { subject: task.id, rationale: why, detail: { agentId: agent.id, probe } });
+          }
+          result = await attemptOnAgent(agent, task);
+        } catch (err) {
+          // Cancelled or the log failed mid-trial: no verdict on the agent, so free
+          // the trial slot rather than leave it claimed for ever.
+          if (probe) registry.endProbe(agent.id);
+          throw err;
+        }
         totalAttempts += result.attempts;
 
         if (result.ok) {
           log('task.completed', { subject: task.id, detail: { agentId: agent.id, attempts: result.attempts } });
+          if (probe) {
+            registry.markHealthy(agent.id);
+            log('agent.recovered', {
+              subject: agent.id,
+              rationale: `Completed trial task ${task.id}; back in full rotation.`,
+            });
+          }
           const done = {
             id: task.id, capability: task.capability, status: 'completed', agentId: agent.id,
             attempts: totalAttempts, triedAgents, output: result.output,
@@ -267,12 +287,20 @@ export function createOrchestrator({
         triedAgents.push(agent.id);
         const failure = errorInfo(result.error);
         previousFailure = { agentId: agent.id, error: failure };
-        // Concurrent tasks can see the same agent fail; take it out (and log it) once.
-        if (registry.isHealthy(agent.id)) {
+        const cooldownS = Math.round(registry.cooldownMs / 100) / 10;
+        if (probe) {
+          registry.markUnhealthy(agent.id, `${failure.name}: ${failure.message}`);
+          log('agent.probe_failed', {
+            subject: agent.id,
+            rationale: `Failed trial task ${task.id} with ${failure.name}; out of rotation for another ${cooldownS} s, then gets one more trial task.`,
+            detail: { error: failure },
+          });
+        } else if (registry.isHealthy(agent.id)) {
+          // Concurrent tasks can see the same agent fail; take it out (and log it) once.
           registry.markUnhealthy(agent.id, `${failure.name}: ${failure.message}`);
           log('agent.marked_unhealthy', {
             subject: agent.id,
-            rationale: `Failed task ${task.id} with ${failure.name}; kept out of rotation for the rest of this orchestrator's life.`,
+            rationale: `Failed task ${task.id} with ${failure.name}; out of rotation for ${cooldownS} s, then gets one trial task.`,
             detail: { error: failure },
           });
         }

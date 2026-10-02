@@ -34,6 +34,32 @@ test('an unhealthy agent drops out of rotation and its reason is kept', () => {
   assert.deepEqual(reg.health(), { p1: 'AgentUnavailableError: not responding', p2: 'healthy' });
 });
 
+test('registry: after the cooldown an agent is offered for one trial at a time', () => {
+  let t = 0;
+  const reg = createRegistry([agent('p1', ['process'])], { cooldownMs: 100, now: () => t });
+  reg.markUnhealthy('p1', 'down');
+  assert.deepEqual(reg.available('process'), []);
+  t = 100;
+  assert.equal(reg.isProbeCandidate('p1'), true);
+  assert.deepEqual(reg.available('process').map((a) => a.id), ['p1']);
+
+  reg.beginProbe('p1');
+  assert.deepEqual(reg.available('process'), [], 'the trial slot is taken');
+  assert.throws(() => reg.beginProbe('p1'), /not due a trial/);
+
+  reg.endProbe('p1'); // cancelled without a verdict: slot freed, cooldown not restarted
+  assert.equal(reg.isProbeCandidate('p1'), true);
+
+  reg.beginProbe('p1');
+  reg.markUnhealthy('p1', 'failed trial'); // failed: cooldown restarts from now
+  assert.equal(reg.isProbeCandidate('p1'), false);
+  t = 200;
+  reg.beginProbe('p1');
+  reg.markHealthy('p1');
+  assert.equal(reg.isHealthy('p1'), true);
+  assert.deepEqual(reg.health(), { p1: 'healthy' });
+});
+
 test('registry refuses two agents with the same id', () => {
   assert.throws(() => createRegistry([agent('a', ['risk']), agent('a', ['process'])]), /share the id a/);
 });

@@ -20,32 +20,70 @@ export function defineAgent({ id, capabilities, run }) {
   return Object.freeze({ id, capabilities: Object.freeze([...new Set(capabilities)]), run });
 }
 
-export function createRegistry(agents) {
+// Recovery (a "circuit breaker" per agent): an agent that fails is out of rotation
+// for cooldownMs. After that it may take ONE trial task at a time — a probe. If the
+// probe succeeds the caller marks it healthy; if it fails the caller marks it
+// unhealthy again, which restarts the cooldown.
+export const DEFAULT_COOLDOWN_MS = 30000;
+
+export function createRegistry(agents, { cooldownMs = DEFAULT_COOLDOWN_MS, now = () => Date.now() } = {}) {
   const byId = new Map();
   for (const agent of agents) {
     if (byId.has(agent.id)) throw new TypeError(`Two agents share the id ${agent.id}`);
     byId.set(agent.id, agent);
   }
-  // id → why it was taken out of rotation. Absent means healthy.
+  // id → { reason, since, probing }. Absent means healthy.
   const unhealthy = new Map();
 
+  const known = (id) => { if (!byId.has(id)) throw new Error(`No agent with id ${id}`); };
+
+  // Out of rotation, cooldown over, and no trial task already running on it.
+  function isProbeCandidate(id) {
+    const s = unhealthy.get(id);
+    return Boolean(s) && !s.probing && now() - s.since >= cooldownMs;
+  }
+
   return {
+    cooldownMs,
     get: (id) => byId.get(id),
     all: () => [...byId.values()],
 
-    // Healthy agents that can do `capability`, in registration order.
+    // Agents that can take a task needing `capability`, in registration order:
+    // healthy ones, plus out-of-rotation ones that are due a trial task.
     available(capability, { exclude = [] } = {}) {
-      return [...byId.values()].filter((a) =>
-        a.capabilities.includes(capability) && !unhealthy.has(a.id) && !exclude.includes(a.id));
+      return [...byId.values()].filter((a) => a.capabilities.includes(capability) && !exclude.includes(a.id)
+        && (!unhealthy.has(a.id) || isProbeCandidate(a.id)));
     },
 
+    isProbeCandidate,
+
+    // Claim the single trial slot. Call straight after choosing the agent.
+    beginProbe(id) {
+      known(id);
+      if (!isProbeCandidate(id)) throw new Error(`Agent ${id} is not due a trial task`);
+      unhealthy.get(id).probing = true;
+    },
+
+    // The trial ended without a verdict (e.g. the operation was cancelled): free the
+    // slot so a later task can try, without restarting the cooldown.
+    endProbe(id) {
+      const s = unhealthy.get(id);
+      if (s) s.probing = false;
+    },
+
+    markHealthy(id) {
+      known(id);
+      unhealthy.delete(id);
+    },
+
+    // Out of rotation from now; the cooldown (re)starts.
     markUnhealthy(id, reason) {
-      if (!byId.has(id)) throw new Error(`No agent with id ${id}`);
-      unhealthy.set(id, reason);
+      known(id);
+      unhealthy.set(id, { reason, since: now(), probing: false });
     },
 
     isHealthy: (id) => byId.has(id) && !unhealthy.has(id),
 
-    health: () => Object.fromEntries([...byId.keys()].map((id) => [id, unhealthy.get(id) ?? 'healthy'])),
+    health: () => Object.fromEntries([...byId.keys()].map((id) => [id, unhealthy.get(id)?.reason ?? 'healthy'])),
   };
 }
