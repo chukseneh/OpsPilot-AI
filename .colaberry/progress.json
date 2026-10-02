@@ -119,10 +119,11 @@
         "tests/audit-log.test.mjs",
         "tests/orchestration-agents.test.mjs",
         "tests/orchestrator.test.mjs",
-        "tests/demo.test.mjs"
+        "tests/demo.test.mjs",
+        "tests/orchestrator.stress.test.mjs"
       ],
       "notes": "Orchestration core with reallocation and a hash-chained audit log; demo: node src/demo/run.js. Agents in the demo are stand-ins. REQ-001 is NOT met yet: no real Microsoft 365 or Google Workspace connector exists (needs credentials); only the connector interface is built.",
-      "updated_at": "2026-10-02T02:50:37.014Z",
+      "updated_at": "2026-10-02T03:03:02.173Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,

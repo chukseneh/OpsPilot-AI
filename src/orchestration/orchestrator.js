@@ -30,7 +30,14 @@ const defaultSleep = (ms, signal) => new Promise((resolve, reject) => {
   signal.addEventListener('abort', onAbort, { once: true });
 });
 
-const errorInfo = (err) => ({ name: err?.name ?? 'Error', message: err?.message ?? String(err) });
+// A plain, always-readable description of whatever an agent failed with. Agents
+// should reject with an Error, but JavaScript allows any value (even undefined),
+// so never read .name or .message off the raw value anywhere else.
+function errorInfo(err) {
+  if (err instanceof Error) return { name: err.name, message: err.message };
+  const got = typeof err === 'string' ? JSON.stringify(err) : String(err);
+  return { name: 'NonErrorRejection', message: `agent failed without an Error (got ${got})` };
+}
 
 export function createOrchestrator({
   registry,
@@ -196,14 +203,15 @@ export function createOrchestrator({
         }
 
         triedAgents.push(agent.id);
-        previousFailure = { agentId: agent.id, error: errorInfo(result.error) };
+        const failure = errorInfo(result.error);
+        previousFailure = { agentId: agent.id, error: failure };
         // Concurrent tasks can see the same agent fail; take it out (and log it) once.
         if (registry.isHealthy(agent.id)) {
-          registry.markUnhealthy(agent.id, `${result.error.name}: ${result.error.message}`);
+          registry.markUnhealthy(agent.id, `${failure.name}: ${failure.message}`);
           log('agent.marked_unhealthy', {
             subject: agent.id,
-            rationale: `Failed task ${task.id} with ${result.error.name}; no further work goes to it in this run.`,
-            detail: { error: errorInfo(result.error) },
+            rationale: `Failed task ${task.id} with ${failure.name}; no further work goes to it in this run.`,
+            detail: { error: failure },
           });
         }
       }

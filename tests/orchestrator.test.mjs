@@ -147,6 +147,30 @@ test('an agent that crashes with an unexpected error is treated as failed and re
   assert.equal(result.tasks[0].agentId, 'finance-2');
 });
 
+test('an agent that rejects with undefined or a string is replaced, without crashing the operation', async () => {
+  // Found by the stress test: reading .name off `undefined` used to crash the whole operation.
+  const silent = scripted('process-1', ['process'], () => Promise.reject(undefined));
+  const stringy = scripted('risk-1', ['risk'], () => Promise.reject('it broke'));
+  const p2 = scripted('process-2', ['process']);
+  const r2 = scripted('risk-2', ['risk']);
+  const { orchestrator, audit } = setup([silent, stringy, p2, r2]);
+
+  const result = await orchestrator.runOperation({
+    operationId: 'op-non-error', requestedBy: manager,
+    tasks: [{ id: 'a', capability: 'process' }, { id: 'b', capability: 'risk' }],
+  });
+
+  assert.equal(result.status, 'completed');
+  assert.deepEqual(result.tasks.map((t) => t.agentId), ['process-2', 'risk-2']);
+  const marked = audit.readAll().filter((e) => e.action === 'agent.marked_unhealthy');
+  assert.equal(marked.length, 2);
+  for (const e of marked) {
+    assert.match(e.rationale, /with NonErrorRejection;/);
+    assert.ok(!/undefined/.test(e.rationale));
+  }
+  assert.match(marked.find((e) => e.subject === 'risk-1').detail.error.message, /got "it broke"/);
+});
+
 // ---- Failure paths: network failure and rate limits ----
 
 test('a network blip is retried on the same agent with backoff, then succeeds', async () => {
