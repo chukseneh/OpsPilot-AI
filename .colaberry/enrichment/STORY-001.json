@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "1",
+  "projectId": "3704f65e-d372-4085-b821-5b5495f688d0",
+  "storyId": "STORY-001",
+  "projectTruthBaseRevision": 1,
+  "observedAt": "2026-10-02T02:45:00.000Z",
+  "sourceCommitSha": "e163557fa044752cd2f17f7fe8358e5b3d9fe337",
+  "factProposals": [
+    {
+      "dimension": "unknowns",
+      "value": "REQ-001 (connect to Microsoft 365 and Google Workspace) is not met: no real connector exists. Building one needs a Microsoft Entra app registration, a Google Cloud OAuth client and a test account for each, which the project does not have yet.",
+      "evidence": "src/connectors/connector.js"
+    },
+    {
+      "dimension": "integrations",
+      "value": "Agents are meant to read email and documents only through a read-only connector interface (listMessages, listDocuments), never through a vendor SDK directly.",
+      "evidence": "src/connectors/connector.js"
+    },
+    {
+      "dimension": "exceptions",
+      "value": "Network failures and rate limits are retried on the same agent (at most 3 attempts, backoff up to 2 s, a service's requested wait honoured up to 10 s); an unavailable, timed-out or crashing agent is taken out of rotation and its task moved to another agent with the same capability; if none is left the task fails and the operation is marked failed.",
+      "evidence": "src/orchestration/orchestrator.js"
+    },
+    {
+      "dimension": "security_context",
+      "value": "Every orchestration step is written to an append-only, hash-chained audit log; credential-like fields are redacted before they are written.",
+      "evidence": "src/audit/auditLog.js"
+    },
+    {
+      "dimension": "actors",
+      "value": "Agents declare one or more capabilities from process, risk and finance; operations are requested by a person (operations_manager in the demo) and run by the orchestrator as a system actor.",
+      "evidence": "src/orchestration/agents.js"
+    }
+  ],
+  "decisions": [
+    {
+      "statement": "Build the orchestration core behind a connector interface, with stand-in agents, instead of calling Microsoft 365 and Google Workspace directly.",
+      "rationale": "No credentials or test tenants are available; the acceptance criteria can be met and tested without them. Confirmed with the student before building.",
+      "evidence": "src/connectors/connector.js"
+    },
+    {
+      "statement": "Retry NetworkError and RateLimitedError on the same agent; reassign on AgentUnavailableError, TimeoutError and any unexpected error.",
+      "rationale": "Network blips and rate limits are about the call, not the agent; an agent that is down, hung or crashing will not get better by being retried.",
+      "evidence": "src/orchestration/errors.js"
+    },
+    {
+      "statement": "Fail closed: if an audit entry cannot be written, cancel all in-flight tasks and reject the operation.",
+      "rationale": "REQ-008 requires every action to be logged; carrying on unrecorded would break the guardrail.",
+      "evidence": "src/orchestration/orchestrator.js"
+    },
+    {
+      "statement": "Save task results by operation id so a completed operation is replayed and a part-finished one resumes without redoing finished tasks; pass agents an idempotencyKey of operationId:taskId.",
+      "rationale": "Every side effect must be idempotent; re-running must not redo work.",
+      "evidence": "src/orchestration/resultStore.js"
+    }
+  ],
+  "limitations": [
+    {
+      "statement": "The only agents are demo stand-ins with scripted, made-up results; no real AI agent exists yet.",
+      "evidence": "src/demo/standInAgents.js"
+    },
+    {
+      "statement": "An agent taken out of rotation stays out for the life of that orchestrator; there is no automatic recovery probe.",
+      "evidence": "src/orchestration/agents.js"
+    },
+    {
+      "statement": "One process may write a given audit log file at a time; concurrent writers are not supported.",
+      "evidence": "src/audit/auditLog.js"
+    },
+    {
+      "statement": "The file result store rewrites one JSON file per update, which suits a single process and modest volumes, not a shared service.",
+      "evidence": "src/orchestration/resultStore.js"
+    }
+  ],
+  "demonstrationEvidence": [
+    { "kind": "test", "ref": "tests/orchestrator.test.mjs" },
+    { "kind": "test", "ref": "tests/audit-log.test.mjs" },
+    { "kind": "test", "ref": "tests/orchestration-agents.test.mjs" },
+    { "kind": "test", "ref": "tests/demo.test.mjs" },
+    { "kind": "demo", "ref": "src/demo/run.js" }
+  ],
+  "measurementEvents": []
+}

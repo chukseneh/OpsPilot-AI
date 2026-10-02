@@ -1,0 +1,301 @@
+// Orchestrator checks for STORY-001. Run with: node --test "tests/*.test.mjs"
+// Agents here are in-process stand-ins whose behaviour each test scripts.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { createOrchestrator } from '../src/orchestration/orchestrator.js';
+import { defineAgent, createRegistry } from '../src/orchestration/agents.js';
+import { createMemoryResultStore, createFileResultStore } from '../src/orchestration/resultStore.js';
+import { AgentUnavailableError, NetworkError, RateLimitedError } from '../src/orchestration/errors.js';
+import { createAuditLog, AuditWriteError } from '../src/audit/auditLog.js';
+
+const tempDir = () => mkdtempSync(join(tmpdir(), 'orch-'));
+const manager = { type: 'person', id: 'operations_manager' };
+
+// An agent that records its calls and behaves as `behaviour(callNumber, task, signal)` says.
+function scripted(id, capabilities, behaviour = () => ({ ok: true })) {
+  const calls = [];
+  const agent = defineAgent({
+    id, capabilities,
+    run: async (task, { signal }) => {
+      calls.push(task);
+      return behaviour(calls.length, task, signal);
+    },
+  });
+  // defineAgent returns a frozen agent; the test copy adds a call log beside it.
+  return { ...agent, calls };
+}
+
+const hangUntilAborted = (signal) => new Promise((_, reject) => {
+  signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+});
+
+function setup(agents, options = {}) {
+  const audit = options.audit ?? createAuditLog({ file: join(tempDir(), 'audit.jsonl') });
+  const waits = [];
+  const orchestrator = createOrchestrator({
+    registry: createRegistry(agents),
+    audit,
+    store: options.store ?? createMemoryResultStore(),
+    timeoutMs: options.timeoutMs ?? 200,
+    sleep: async (ms) => { waits.push(ms); },
+  });
+  const actions = () => audit.readAll().map((e) => e.action);
+  return { orchestrator, audit, waits, actions };
+}
+
+const processOp = (operationId = 'op-1') => ({
+  operationId,
+  requestedBy: manager,
+  tasks: [
+    { id: 'map-process', capability: 'process', input: { process: 'invoice approval' } },
+    { id: 'assess-risk', capability: 'risk', input: {} },
+    { id: 'estimate-cost', capability: 'finance', input: {} },
+  ],
+});
+
+// ---- Acceptance 1: several agents, one operation, all done ----
+
+test('a process operation is split across the process, risk and finance agents and completes', async () => {
+  const p = scripted('process-1', ['process'], () => ({ steps: 4 }));
+  const r = scripted('risk-1', ['risk'], () => ({ rating: 'medium' }));
+  const f = scripted('finance-1', ['finance'], () => ({ cost: 1200 }));
+  const { orchestrator, audit, actions } = setup([p, r, f]);
+
+  const result = await orchestrator.runOperation(processOp());
+
+  assert.equal(result.status, 'completed');
+  assert.deepEqual(result.tasks.map((t) => [t.id, t.agentId, t.status]), [
+    ['map-process', 'process-1', 'completed'],
+    ['assess-risk', 'risk-1', 'completed'],
+    ['estimate-cost', 'finance-1', 'completed'],
+  ]);
+  assert.deepEqual(result.tasks[0].output, { steps: 4 });
+  assert.equal(p.calls[0].idempotencyKey, 'op-1:map-process');
+  assert.equal(actions()[0], 'operation.started');
+  assert.equal(actions().at(-1), 'operation.completed');
+  assert.equal(actions().filter((a) => a === 'task.assigned').length, 3);
+  assert.equal(actions().filter((a) => a === 'task.completed').length, 3);
+  assert.equal(audit.verify().ok, true);
+});
+
+test('tasks needing the same capability are spread across the agents that have it', async () => {
+  const a = scripted('process-1', ['process']);
+  const b = scripted('process-2', ['process']);
+  const { orchestrator } = setup([a, b]);
+  const result = await orchestrator.runOperation({
+    operationId: 'op-spread', requestedBy: manager,
+    tasks: [{ id: 't1', capability: 'process' }, { id: 't2', capability: 'process' }],
+  });
+  assert.deepEqual(result.tasks.map((t) => t.agentId).sort(), ['process-1', 'process-2']);
+});
+
+// ---- Acceptance 2: an agent fails, its task moves to another agent ----
+
+test('an unavailable agent is taken out of rotation and its task is reassigned', async () => {
+  const down = scripted('process-1', ['process'], () => { throw new AgentUnavailableError('not responding'); });
+  const backup = scripted('process-2', ['process']);
+  const { orchestrator, audit, actions } = setup([down, backup]);
+
+  const result = await orchestrator.runOperation({
+    operationId: 'op-down', requestedBy: manager, tasks: [{ id: 'map-process', capability: 'process' }],
+  });
+
+  assert.equal(result.status, 'completed');
+  assert.equal(result.tasks[0].agentId, 'process-2');
+  assert.deepEqual(result.tasks[0].triedAgents, ['process-1']);
+  assert.equal(down.calls.length, 1, 'an unavailable agent is not retried');
+  assert.deepEqual(actions(), [
+    'operation.started', 'task.assigned', 'task.attempt_failed', 'agent.marked_unhealthy',
+    'task.reassigned', 'task.completed', 'operation.completed',
+  ]);
+  const moved = audit.readAll().find((e) => e.action === 'task.reassigned');
+  assert.deepEqual([moved.detail.from, moved.detail.to], ['process-1', 'process-2']);
+  assert.match(moved.rationale, /process-1 failed \(AgentUnavailableError\)/);
+});
+
+test('an agent that hangs past the timeout is cancelled and its task is reassigned', async () => {
+  let sawAbort = false;
+  const slow = scripted('risk-1', ['risk'], (_n, _t, signal) => {
+    signal.addEventListener('abort', () => { sawAbort = true; });
+    return hangUntilAborted(signal);
+  });
+  const backup = scripted('risk-2', ['risk']);
+  const { orchestrator, audit } = setup([slow, backup], { timeoutMs: 30 });
+
+  const result = await orchestrator.runOperation({
+    operationId: 'op-slow', requestedBy: manager, tasks: [{ id: 'assess-risk', capability: 'risk' }],
+  });
+
+  assert.equal(result.tasks[0].agentId, 'risk-2');
+  assert.ok(sawAbort, 'the hung agent was told to stop');
+  const failed = audit.readAll().find((e) => e.action === 'task.attempt_failed');
+  assert.equal(failed.detail.error.name, 'TimeoutError');
+});
+
+test('an agent that crashes with an unexpected error is treated as failed and replaced', async () => {
+  const buggy = scripted('finance-1', ['finance'], () => { throw new TypeError('cannot read properties of undefined'); });
+  const backup = scripted('finance-2', ['finance']);
+  const { orchestrator } = setup([buggy, backup]);
+  const result = await orchestrator.runOperation({
+    operationId: 'op-bug', requestedBy: manager, tasks: [{ id: 'estimate-cost', capability: 'finance' }],
+  });
+  assert.equal(result.tasks[0].agentId, 'finance-2');
+});
+
+// ---- Failure paths: network failure and rate limits ----
+
+test('a network blip is retried on the same agent with backoff, then succeeds', async () => {
+  const flaky = scripted('process-1', ['process'], (n) => {
+    if (n === 1) throw new NetworkError('ECONNRESET');
+    return { ok: true };
+  });
+  const other = scripted('process-2', ['process']);
+  const { orchestrator, waits, actions } = setup([flaky, other]);
+
+  const result = await orchestrator.runOperation({
+    operationId: 'op-blip', requestedBy: manager, tasks: [{ id: 't', capability: 'process' }],
+  });
+
+  assert.equal(result.tasks[0].agentId, 'process-1');
+  assert.equal(result.tasks[0].attempts, 2);
+  assert.equal(other.calls.length, 0);
+  assert.deepEqual(waits, [100]);
+  assert.ok(actions().includes('task.retry_scheduled'));
+});
+
+test('retries are capped: a network failure that persists moves the task after 3 attempts', async () => {
+  const offline = scripted('process-1', ['process'], () => { throw new NetworkError('ENOTFOUND'); });
+  const backup = scripted('process-2', ['process']);
+  const { orchestrator, waits } = setup([offline, backup]);
+
+  const result = await orchestrator.runOperation({
+    operationId: 'op-offline', requestedBy: manager, tasks: [{ id: 't', capability: 'process' }],
+  });
+
+  assert.equal(offline.calls.length, 3);
+  assert.deepEqual(waits, [100, 200]);
+  assert.equal(result.tasks[0].agentId, 'process-2');
+  assert.equal(result.tasks[0].attempts, 4);
+});
+
+test("a rate limit waits as long as the service asks, but never more than the cap", async () => {
+  const limited = scripted('risk-1', ['risk'], (n) => {
+    if (n === 1) throw new RateLimitedError('429', { retryAfterMs: 750 });
+    if (n === 2) throw new RateLimitedError('429', { retryAfterMs: 600000 });
+    return { ok: true };
+  });
+  const { orchestrator, waits } = setup([limited]);
+  const result = await orchestrator.runOperation({
+    operationId: 'op-429', requestedBy: manager, tasks: [{ id: 't', capability: 'risk' }],
+  });
+  assert.equal(result.status, 'completed');
+  assert.deepEqual(waits, [750, 10000]);
+});
+
+// ---- When no agent can do it ----
+
+test('if every agent with a capability fails, that task fails cleanly and the rest still finish', async () => {
+  const p = scripted('process-1', ['process']);
+  const f = scripted('finance-1', ['finance'], () => { throw new AgentUnavailableError('offline'); });
+  const r = scripted('risk-1', ['risk']);
+  const { orchestrator, audit } = setup([p, r, f]);
+
+  const result = await orchestrator.runOperation(processOp('op-no-finance'));
+
+  assert.equal(result.status, 'failed');
+  const finance = result.tasks.find((t) => t.id === 'estimate-cost');
+  assert.equal(finance.status, 'failed');
+  assert.equal(finance.error.name, 'NoAgentAvailableError');
+  assert.deepEqual(finance.triedAgents, ['finance-1']);
+  assert.equal(result.tasks.filter((t) => t.status === 'completed').length, 2);
+  const last = audit.readAll().at(-1);
+  assert.equal(last.action, 'operation.failed');
+  assert.deepEqual(last.detail.failed, ['estimate-cost']);
+});
+
+// ---- Running it twice ----
+
+test('running a completed operation again calls no agent and is logged as a replay', async () => {
+  const p = scripted('process-1', ['process']);
+  const r = scripted('risk-1', ['risk']);
+  const f = scripted('finance-1', ['finance']);
+  const { orchestrator, actions } = setup([p, r, f]);
+
+  const first = await orchestrator.runOperation(processOp('op-twice'));
+  const second = await orchestrator.runOperation(processOp('op-twice'));
+
+  assert.equal(second.replayed, true);
+  assert.deepEqual(second.tasks, first.tasks);
+  assert.equal(p.calls.length + r.calls.length + f.calls.length, 3);
+  assert.equal(actions().at(-1), 'operation.replayed');
+});
+
+test('re-running a part-failed operation only redoes the unfinished task (file store survives restarts)', async () => {
+  const dir = tempDir();
+  const store = createFileResultStore({ file: join(dir, 'results.json') });
+  const audit = createAuditLog({ file: join(dir, 'audit.jsonl') });
+
+  const p1 = scripted('process-1', ['process']);
+  const r1 = scripted('risk-1', ['risk']);
+  const fDown = scripted('finance-1', ['finance'], () => { throw new AgentUnavailableError('offline'); });
+  const first = await setup([p1, r1, fDown], { store, audit }).orchestrator.runOperation(processOp('op-resume'));
+  assert.equal(first.status, 'failed');
+
+  // "Restart": new orchestrator and agents, same store and audit file.
+  const p2 = scripted('process-1', ['process']);
+  const r2 = scripted('risk-1', ['risk']);
+  const fUp = scripted('finance-1', ['finance']);
+  const second = await setup([p2, r2, fUp], { store, audit: createAuditLog({ file: join(dir, 'audit.jsonl') }) })
+    .orchestrator.runOperation(processOp('op-resume'));
+
+  assert.equal(second.status, 'completed');
+  assert.equal(p2.calls.length + r2.calls.length, 0, 'finished tasks were not redone');
+  assert.equal(fUp.calls.length, 1);
+  assert.equal(createAuditLog({ file: join(dir, 'audit.jsonl') }).verify().ok, true);
+});
+
+// ---- Trust: audit is not optional ----
+
+test('if the audit log cannot be written, in-flight work is cancelled and the operation rejects', async () => {
+  const real = createAuditLog({ file: join(tempDir(), 'audit.jsonl') });
+  let writes = 0;
+  const failingAudit = {
+    readAll: () => real.readAll(),
+    append(e) {
+      writes += 1;
+      if (writes > 3) throw new AuditWriteError('disk full');
+      return real.append(e);
+    },
+  };
+  let cancelled = false;
+  const slow = scripted('process-1', ['process'], (_n, _t, signal) => {
+    signal.addEventListener('abort', () => { cancelled = true; });
+    return hangUntilAborted(signal);
+  });
+  const quick = scripted('risk-1', ['risk']);
+  const { orchestrator } = setup([slow, quick], { audit: failingAudit, timeoutMs: 5000 });
+
+  await assert.rejects(orchestrator.runOperation({
+    operationId: 'op-audit-down', requestedBy: manager,
+    tasks: [{ id: 'slow', capability: 'process' }, { id: 'quick', capability: 'risk' }],
+  }), AuditWriteError);
+  assert.ok(cancelled, 'the in-flight agent was cancelled');
+});
+
+test('a malformed operation is refused, and the refusal is logged', async () => {
+  const { orchestrator, audit } = setup([scripted('process-1', ['process'])]);
+  await assert.rejects(orchestrator.runOperation({
+    operationId: 'op-bad', requestedBy: manager, tasks: [{ id: 't', capability: 'process' }, { id: 't', capability: 'process' }],
+  }), /used twice/);
+  await assert.rejects(orchestrator.runOperation({
+    operationId: 'op-bad-2', requestedBy: manager, tasks: [{ id: 't', capability: 'marketing' }],
+  }), /unknown capability/);
+  assert.deepEqual(audit.readAll().map((e) => [e.correlationId, e.action]), [
+    ['op-bad', 'operation.rejected'], ['op-bad-2', 'operation.rejected'],
+  ]);
+});
