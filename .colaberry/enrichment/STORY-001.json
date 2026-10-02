@@ -68,6 +68,10 @@
       "evidence": "src/audit/auditLog.js"
     },
     {
+      "statement": "The hash chain detects edits and removals anywhere except the end: deleting the last entries leaves a valid chain. Detecting that needs the latest hash anchored outside the file (STORY-006).",
+      "evidence": "src/audit/auditLog.js"
+    },
+    {
       "statement": "The file result store rewrites one JSON file per update, which suits a single process and modest volumes, not a shared service.",
       "evidence": "src/orchestration/resultStore.js"
     }
