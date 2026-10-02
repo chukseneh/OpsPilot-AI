@@ -147,21 +147,36 @@
       "criteria": [
         {
           "text": "Given a set of process data, when the analysis is initiated, then the system should provide a detailed report of inefficiencies.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given an incomplete data set, when the analysis is attempted, then the system should notify the user of missing data.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: The system logs all analysis activities with timestamps and user IDs for audit purposes.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/analysis/processData.js",
+        "src/analysis/analyse.js",
+        "src/analysis/report.js",
+        "src/analysis/service.js",
+        "src/analysis/processAgent.js",
+        "src/demo/sampleProcessData.js",
+        "src/demo/analyse.js",
+        ".colaberry/enrichment/STORY-002.json"
+      ],
+      "tests_added": [
+        "tests/process-data.test.mjs",
+        "tests/analyse.test.mjs",
+        "tests/report.test.mjs",
+        "tests/analysis-service.test.mjs",
+        "tests/analysis-demo.test.mjs"
+      ],
+      "notes": "Process analysis from an event log: bottlenecks, duplicated work, automation candidates, as a detailed report; incomplete data returns a missing-data notice instead; analysts and operations managers only; every step audited with user id and timestamp. Demo: node src/demo/analyse.js (synthetic data). Input is a JSON event log until a real connector exists (REQ-001).",
+      "updated_at": "2026-10-02T23:47:19.947Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,

@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "1",
+  "projectId": "3704f65e-d372-4085-b821-5b5495f688d0",
+  "storyId": "STORY-002",
+  "projectTruthBaseRevision": 1,
+  "observedAt": "2026-10-03T00:00:00.000Z",
+  "sourceCommitSha": "25da9b84e9028eabd41666e50d401bd3b0c3b9a4",
+  "factProposals": [
+    {
+      "dimension": "inputs",
+      "value": "Process analysis takes a process event log: a process name and one row per step with caseId, activity, actor, startedAt and endedAt (ISO 8601 with a time zone). Until a Microsoft 365 / Google Workspace connector exists it is supplied as JSON.",
+      "evidence": "src/analysis/processData.js"
+    },
+    {
+      "dimension": "outputs",
+      "value": "A detailed report (JSON and readable text): numbered findings for bottlenecks, duplicated work and automation candidates, each with an explanation, the numbers and example cases, plus the method used and what the report cannot tell you.",
+      "evidence": "src/analysis/report.js"
+    },
+    {
+      "dimension": "approval_points",
+      "value": "Only the process analyst and operations manager roles may run an analysis or read a saved one; anyone else is refused and the refusal is logged.",
+      "evidence": "src/analysis/service.js"
+    },
+    {
+      "dimension": "exceptions",
+      "value": "Incomplete or malformed data (missing fields, timestamps without a time zone, steps ending before they start, fewer than 3 complete cases) stops the analysis; the user gets a notice listing each problem by field, row and case. An interrupted or timed-out analysis saves nothing and can be re-run.",
+      "evidence": "src/analysis/processData.js"
+    },
+    {
+      "dimension": "ai_opportunities",
+      "value": "Automation candidates are steps in at least 30% of cases that usually take 15 minutes or less with a consistent duration; they are flagged as candidates only, with no savings estimate.",
+      "evidence": "src/analysis/analyse.js"
+    },
+    {
+      "dimension": "security_context",
+      "value": "Every analysis activity (request, start, completion, missing data, refusal, interruption, replay) is written to the hash-chained audit log with the requesting user's id and a timestamp.",
+      "evidence": "tests/analysis-service.test.mjs"
+    }
+  ],
+  "decisions": [
+    {
+      "statement": "Refuse to analyse incomplete data and list what is missing, rather than analysing the complete rows and flagging the rest.",
+      "rationale": "A report built on gaps could point at the wrong bottleneck. Chosen by the student before building.",
+      "evidence": "src/analysis/processData.js"
+    },
+    {
+      "statement": "Allow the process analyst and operations manager roles to run analyses.",
+      "rationale": "They are the roles in the plan that own process analysis and orchestration. Chosen by the student before building.",
+      "evidence": "src/analysis/service.js"
+    },
+    {
+      "statement": "Find inefficiencies with explicit, named rules and thresholds (2x typical or 25% of case time for bottlenecks; 30% frequency, 15 minutes or less and consistent duration for automation; at least 3 observations), reported in every report.",
+      "rationale": "Every finding must be explainable to the person reading it.",
+      "evidence": "src/analysis/analyse.js"
+    },
+    {
+      "statement": "Run the process analyst as a real agent under the STORY-001 orchestrator, returning refused requests and missing data as results rather than agent failures.",
+      "rationale": "Throwing them would take a healthy agent out of rotation over a bad request.",
+      "evidence": "src/analysis/processAgent.js"
+    }
+  ],
+  "limitations": [
+    {
+      "statement": "There is no login: the user id and role are whatever the caller states. The permission check is real; identity is not verified.",
+      "evidence": "src/analysis/service.js"
+    },
+    {
+      "statement": "Durations are clock time, so waits include nights and weekends; there is no working-hours calendar.",
+      "evidence": "src/analysis/report.js"
+    },
+    {
+      "statement": "Bottlenecks are judged relative to the process's own typical step and wait, so in a process of very short steps a moderately long step can be flagged.",
+      "evidence": "src/analysis/analyse.js"
+    },
+    {
+      "statement": "Validation of the input runs in one go and cannot be interrupted; only the analysis itself is subject to the time limit.",
+      "evidence": "src/analysis/service.js"
+    },
+    {
+      "statement": "The only data analysed so far is synthetic demo data; no real organisation's process has been analysed.",
+      "evidence": "src/demo/sampleProcessData.js"
+    }
+  ],
+  "demonstrationEvidence": [
+    { "kind": "test", "ref": "tests/analysis-service.test.mjs" },
+    { "kind": "test", "ref": "tests/analyse.test.mjs" },
+    { "kind": "test", "ref": "tests/process-data.test.mjs" },
+    { "kind": "test", "ref": "tests/report.test.mjs" },
+    { "kind": "test", "ref": "tests/analysis-demo.test.mjs" },
+    { "kind": "demo", "ref": "src/demo/analyse.js" }
+  ],
+  "measurementEvents": []
+}
