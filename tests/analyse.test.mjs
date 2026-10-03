@@ -77,6 +77,27 @@ test('finds repeated work and parallel duplicated effort, without counting one a
   assert.ok(!r.duplicates.some((d) => d.kind === 'repeated' && d.activity === 'Approve'), 'parallel is not also counted as a repeat');
 });
 
+test('steps starting at the same moment get the same wait, whatever order the rows are in', async () => {
+  // Found by the stress test: the row listed first used to get the whole wait and
+  // the other 0, so the report could blame a different step for the same data.
+  const at = (d, h, m) => new Date(Date.UTC(2026, 8, d, h, m)).toISOString();
+  const make = (logFirst) => ({
+    process: 'p',
+    events: [1, 2, 3].flatMap((d) => {
+      const approve = { caseId: `C${d}`, activity: 'Approve', actor: 'm', startedAt: at(d, 11, 0), endedAt: at(d, 11, 30) };
+      const logged = { caseId: `C${d}`, activity: 'Log', actor: 'c', startedAt: at(d, 11, 0), endedAt: at(d, 11, 5) };
+      return [{ caseId: `C${d}`, activity: 'Receive', actor: 'c', startedAt: at(d, 9, 0), endedAt: at(d, 9, 5) },
+        ...(logFirst ? [logged, approve] : [approve, logged])];
+    }),
+  });
+  const a = await analyse(validateDataset(make(false)));
+  const b = await analyse(validateDataset(make(true)));
+  const waits = (r) => Object.fromEntries(r.activities.map((x) => [x.activity, x.medianWaitMs]));
+  assert.deepEqual(waits(a), { Receive: null, Approve: 115 * MIN, Log: 115 * MIN });
+  assert.deepEqual(waits(b), waits(a));
+  assert.deepEqual(b.bottlenecks.map((x) => `${x.activity}/${x.kind}`).sort(), a.bottlenecks.map((x) => `${x.activity}/${x.kind}`).sort());
+});
+
 test('a smooth process produces no findings — nothing is invented', async () => {
   const smooth = Array.from({ length: 6 }, () => [['A', 0, 30], ['B', 30, 60], ['C', 60, 90], ['D', 90, 120], ['E', 120, 150]]);
   const r = await analyse(log(smooth));

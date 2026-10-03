@@ -57,6 +57,11 @@
       "statement": "Run the process analyst as a real agent under the STORY-001 orchestrator, returning refused requests and missing data as results rather than agent failures.",
       "rationale": "Throwing them would take a healthy agent out of rotation over a bad request.",
       "evidence": "src/analysis/processAgent.js"
+    },
+    {
+      "statement": "Treat steps that start at the same instant as concurrent: each gets the same wait, and results (and finding order) do not depend on the order of rows in the input or the time zone timestamps are written in.",
+      "rationale": "Found by a randomised stress test: the row listed first used to take the whole wait, so the same data could blame a different step for a bottleneck.",
+      "evidence": "tests/analysis.stress.test.mjs"
     }
   ],
   "limitations": [
@@ -82,12 +87,34 @@
     }
   ],
   "demonstrationEvidence": [
-    { "kind": "test", "ref": "tests/analysis-service.test.mjs" },
-    { "kind": "test", "ref": "tests/analyse.test.mjs" },
-    { "kind": "test", "ref": "tests/process-data.test.mjs" },
-    { "kind": "test", "ref": "tests/report.test.mjs" },
-    { "kind": "test", "ref": "tests/analysis-demo.test.mjs" },
-    { "kind": "demo", "ref": "src/demo/analyse.js" }
+    {
+      "kind": "test",
+      "ref": "tests/analysis-service.test.mjs"
+    },
+    {
+      "kind": "test",
+      "ref": "tests/analyse.test.mjs"
+    },
+    {
+      "kind": "test",
+      "ref": "tests/process-data.test.mjs"
+    },
+    {
+      "kind": "test",
+      "ref": "tests/report.test.mjs"
+    },
+    {
+      "kind": "test",
+      "ref": "tests/analysis-demo.test.mjs"
+    },
+    {
+      "kind": "demo",
+      "ref": "src/demo/analyse.js"
+    },
+    {
+      "kind": "test",
+      "ref": "tests/analysis.stress.test.mjs"
+    }
   ],
   "measurementEvents": []
 }

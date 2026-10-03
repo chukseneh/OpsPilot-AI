@@ -60,7 +60,15 @@ const minOf = (xs) => xs.reduce((a, b) => (b < a ? b : a), Infinity);
 const maxOf = (xs) => xs.reduce((a, b) => (b > a ? b : a), -Infinity);
 
 // Up to `n` case ids with the largest value, for evidence in the report.
-const topCases = (pairs, n = 3) => [...pairs].sort((a, b) => b.ms - a.ms).slice(0, n).map((p) => ({ caseId: p.caseId, ms: p.ms }));
+// Fixed tie-breaks, so equal-ranked items come out in the same order whatever
+// order the rows were in (finding numbers F1, F2… must not depend on the export).
+// Plain code-point comparison, not localeCompare, so it is the same on every machine.
+const cmp = (x, y) => (x < y ? -1 : x > y ? 1 : 0);
+const byName = (a, b) => cmp(a.activity, b.activity) || cmp(a.kind ?? '', b.kind ?? '');
+
+const topCases = (pairs, n = 3) => [...pairs]
+  .sort((a, b) => b.ms - a.ms || cmp(a.caseId, b.caseId))
+  .slice(0, n).map((p) => ({ caseId: p.caseId, ms: p.ms }));
 
 export async function analyse(validation, { thresholds = {}, signal } = {}) {
   if (!validation?.ok) throw new TypeError('analyse() needs a validated data set: call validateDataset() and check ok first');
@@ -97,7 +105,11 @@ export async function analyse(validation, { thresholds = {}, signal } = {}) {
     const caseEnd = maxOf(events.map((e) => e.end));
     caseDurations.push({ caseId, ms: caseEnd - caseStart });
 
-    let latestEnd = null;
+    // Nothing below may depend on the order rows appear in the file: steps that
+    // start at the same instant are concurrent, and are treated identically.
+    let groupStart = null; // start time of the group of steps being processed
+    let endBeforeGroup = null; // latest end among steps that started BEFORE that group
+    let latestEnd = -Infinity; // latest end among all steps processed so far
     events.forEach((e, i) => {
       const s = stat(e.activity);
       const duration = e.end - e.start;
@@ -106,20 +118,26 @@ export async function analyse(validation, { thresholds = {}, signal } = {}) {
       s.cases.add(caseId);
       s.actors.add(e.actor);
       s.perCase.set(caseId, [...(s.perCase.get(caseId) ?? []), e]);
-      if (i > 0) {
-        // Waiting = idle time since everything before it in this case finished.
-        const wait = Math.max(0, e.start - latestEnd);
+
+      if (e.start !== groupStart) { // events are sorted, so everything seen so far started earlier
+        groupStart = e.start;
+        endBeforeGroup = latestEnd;
+      }
+      if (e.start !== caseStart) {
+        // Waiting = idle time since everything that started before it had finished.
+        const wait = Math.max(0, e.start - endBeforeGroup);
         s.waits.push(wait);
         s.waitsByCase.push({ caseId, ms: wait });
       }
-      latestEnd = latestEnd === null ? e.end : Math.max(latestEnd, e.end);
+      latestEnd = Math.max(latestEnd, e.end);
 
-      // Same activity, different person, overlapping in time: duplicated effort.
-      for (const earlier of events.slice(0, i)) {
-        if (earlier.activity === e.activity && earlier.actor !== e.actor && e.start < earlier.end) {
-          const overlapMs = Math.min(e.end, earlier.end) - e.start;
+      // Same activity, different person, sharing time: duplicated effort. Each
+      // pair is counted once; zero-length steps share no time.
+      for (const other of events.slice(0, i)) {
+        const overlapMs = Math.min(e.end, other.end) - Math.max(e.start, other.start);
+        if (other.activity === e.activity && other.actor !== e.actor && overlapMs > 0) {
           if (!parallel.has(e.activity)) parallel.set(e.activity, []);
-          parallel.get(e.activity).push({ caseId, overlapMs, actors: [earlier.actor, e.actor] });
+          parallel.get(e.activity).push({ caseId, overlapMs, actors: [other.actor, e.actor].sort() });
         }
       }
     });
@@ -164,18 +182,18 @@ export async function analyse(validation, { thresholds = {}, signal } = {}) {
       });
     }
   }
-  bottlenecks.sort((a, b) => b.totalMs - a.totalMs);
+  bottlenecks.sort((a, b) => b.totalMs - a.totalMs || byName(a, b));
   await checkpoint('after finding bottlenecks');
 
   // ---- 4. Duplicated activities ----
   const duplicates = [];
   for (const [activity, s] of act) {
-    // A repeat is the activity done AGAIN after an earlier occurrence finished.
-    // Overlapping occurrences are the "parallel" kind below, not counted twice.
+    // A repeat is the activity done AGAIN: an earlier occurrence started before it
+    // and had finished by the time it started. Overlapping occurrences are the
+    // "parallel" kind below, not counted twice.
     const extra = [];
     for (const [caseId, evs] of s.perCase) {
-      const sorted = [...evs].sort((a, b) => a.start - b.start);
-      const again = sorted.filter((e, i) => i > 0 && sorted.slice(0, i).some((p) => e.start >= p.end));
+      const again = evs.filter((e) => evs.some((p) => p !== e && p.start < e.start && p.end <= e.start));
       if (again.length) extra.push({ caseId, ms: sum(again.map((e) => e.end - e.start)), again: again.length });
     }
     if (extra.length) {
@@ -200,7 +218,7 @@ export async function analyse(validation, { thresholds = {}, signal } = {}) {
       exampleCases: topCases(pairs.map((p) => ({ caseId: p.caseId, ms: p.overlapMs }))),
     });
   }
-  duplicates.sort((a, b) => b.extraTimeMs - a.extraTimeMs);
+  duplicates.sort((a, b) => b.extraTimeMs - a.extraTimeMs || byName(a, b));
   await checkpoint('after finding duplicates');
 
   // ---- 5. Automation candidates ----
@@ -221,7 +239,7 @@ export async function analyse(validation, { thresholds = {}, signal } = {}) {
       ],
     });
   }
-  automationCandidates.sort((a, b) => b.totalMs - a.totalMs);
+  automationCandidates.sort((a, b) => b.totalMs - a.totalMs || byName(a, b));
   await checkpoint('after finding automation candidates');
 
   return {
@@ -245,7 +263,7 @@ export async function analyse(validation, { thresholds = {}, signal } = {}) {
     activities: [...act].map(([activity, s]) => ({
       activity, occurrences: s.durations.length, cases: s.cases.size,
       medianDurationMs: median(s.durations), medianWaitMs: s.waits.length ? median(s.waits) : null,
-    })).sort((a, b) => b.occurrences - a.occurrences),
+    })).sort((a, b) => b.occurrences - a.occurrences || byName(a, b)),
     thresholds: t,
   };
 }

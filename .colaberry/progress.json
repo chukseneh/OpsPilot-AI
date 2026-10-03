@@ -173,10 +173,11 @@
         "tests/analyse.test.mjs",
         "tests/report.test.mjs",
         "tests/analysis-service.test.mjs",
-        "tests/analysis-demo.test.mjs"
+        "tests/analysis-demo.test.mjs",
+        "tests/analysis.stress.test.mjs"
       ],
       "notes": "Process analysis from an event log: bottlenecks, duplicated work, automation candidates, as a detailed report; incomplete data returns a missing-data notice instead; analysts and operations managers only; every step audited with user id and timestamp. Demo: node src/demo/analyse.js (synthetic data). Input is a JSON event log until a real connector exists (REQ-001).",
-      "updated_at": "2026-10-02T23:47:19.947Z",
+      "updated_at": "2026-10-03T00:06:43.222Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,
