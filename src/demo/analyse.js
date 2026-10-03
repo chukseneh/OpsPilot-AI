@@ -27,12 +27,14 @@ const MANAGER = { type: 'person', id: 'operations_manager' };
 export async function runAnalysisDemo({ outDir, print = console.log } = {}) {
   const dir = outDir ?? mkdtempSync(join(tmpdir(), 'opspilot-analysis-'));
   const audit = createAuditLog({ file: join(dir, 'audit.jsonl') });
-  const service = createAnalysisService({ audit, store: createFileResultStore({ file: join(dir, 'analyses.json') }) });
+  // The service's time limit is shorter than the orchestrator's, so a slow analysis
+  // stops itself and reports "interrupted" rather than being blamed on the agent.
+  const service = createAnalysisService({ audit, store: createFileResultStore({ file: join(dir, 'analyses.json') }), timeoutMs: 60000 });
   const orchestrator = createOrchestrator({
     registry: createRegistry([createProcessAnalystAgent({ service })]),
     audit,
     store: createFileResultStore({ file: join(dir, 'operations.json') }),
-    timeoutMs: 60000,
+    timeoutMs: 90000,
   });
   const firstSeq = audit.readAll().length; // entries before this run (a reused --out folder has some)
   const run = async (operationId, user, dataset) => {

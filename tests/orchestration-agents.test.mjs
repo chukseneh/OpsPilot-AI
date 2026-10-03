@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import { defineAgent, createRegistry } from '../src/orchestration/agents.js';
 import {
-  classify, AgentUnavailableError, TimeoutError, NetworkError, RateLimitedError,
+  classify, AgentUnavailableError, TimeoutError, NetworkError, RateLimitedError, TaskFailedError,
 } from '../src/orchestration/errors.js';
 import { defineConnector } from '../src/connectors/connector.js';
 
@@ -70,6 +70,7 @@ test('network failures and rate limits are retried; unavailability, timeouts and
   assert.equal(classify(new AgentUnavailableError('down')), 'reassign');
   assert.equal(classify(new TimeoutError('slow', { timeoutMs: 100 })), 'reassign');
   assert.equal(classify(new TypeError('bug in agent')), 'reassign');
+  assert.equal(classify(new TaskFailedError('this task could not finish')), 'fail');
   assert.equal(new RateLimitedError('429', { retryAfterMs: 500 }).retryAfterMs, 500);
   assert.equal(new TimeoutError('slow').name, 'TimeoutError');
 });

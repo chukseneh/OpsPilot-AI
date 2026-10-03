@@ -5,6 +5,10 @@
 //   reassign  — the agent itself cannot do the work: AgentUnavailableError,
 //               TimeoutError, or any error we did not expect. Take the agent out
 //               of rotation and give the task to ANOTHER agent.
+//   fail      — the agent is fine, but THIS task could not finish this time
+//               (TaskFailedError, e.g. an analysis that hit its own time limit).
+//               Fail the task at once: no retry, no other agent, the agent stays
+//               in rotation, and the operation is marked failed so it re-runs.
 
 export class OrchestrationError extends Error {
   constructor(message, options) {
@@ -39,7 +43,12 @@ export class NoAgentAvailableError extends OrchestrationError {}
 // returning or resuming the old work would answer a question nobody asked.
 export class OperationConflictError extends OrchestrationError {}
 
+// The agent worked but this task did not finish (see "fail" above). Raise it only
+// when another agent would do no better and the agent itself is healthy.
+export class TaskFailedError extends OrchestrationError {}
+
 export function classify(err) {
   if (err instanceof NetworkError || err instanceof RateLimitedError) return 'retry';
+  if (err instanceof TaskFailedError) return 'fail';
   return 'reassign';
 }

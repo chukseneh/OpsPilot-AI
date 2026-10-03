@@ -62,6 +62,16 @@
       "statement": "Treat steps that start at the same instant as concurrent: each gets the same wait, and results (and finding order) do not depend on the order of rows in the input or the time zone timestamps are written in.",
       "rationale": "Found by a randomised stress test: the row listed first used to take the whole wait, so the same data could blame a different step for a bottleneck.",
       "evidence": "tests/analysis.stress.test.mjs"
+    },
+    {
+      "statement": "Add a third kind of agent failure, TaskFailedError (\"this task failed, the agent is fine\"): the orchestrator fails the task at once, keeps the agent in rotation and marks the operation failed so it re-runs. The process analyst raises it for an interrupted analysis.",
+      "rationale": "Found in code review: an interrupted analysis came back as normal output, so the orchestrator saved the operation as completed and replayed \"interrupted\" for ever; blaming the agent instead would have taken the only process analyst out of rotation.",
+      "evidence": "src/orchestration/errors.js"
+    },
+    {
+      "statement": "Give the analysis service a shorter time limit than the orchestrator (demo: 60 s vs 90 s).",
+      "rationale": "Then a slow analysis stops itself and reports interrupted; if the orchestrator limit fired first it would treat the agent as failed and take it out of rotation for its cooldown.",
+      "evidence": "src/analysis/processAgent.js"
     }
   ],
   "limitations": [
@@ -84,6 +94,10 @@
     {
       "statement": "The only data analysed so far is synthetic demo data; no real organisation's process has been analysed.",
       "evidence": "src/demo/sampleProcessData.js"
+    },
+    {
+      "statement": "The service-shorter-than-orchestrator time limit is a wiring rule documented in code, not enforced: a deployment that sets them the other way round would take the process analyst out of rotation on a slow analysis.",
+      "evidence": "src/analysis/processAgent.js"
     }
   ],
   "demonstrationEvidence": [

@@ -24,27 +24,15 @@
 // If the audit log (or the result store) cannot be written, every in-flight task
 // is cancelled and runOperation rejects: nothing carries on unrecorded.
 
-import { createHash } from 'node:crypto';
-
 import { classify, NoAgentAvailableError, TimeoutError, RateLimitedError, OperationConflictError } from './errors.js';
 import { CAPABILITIES } from './agents.js';
+import { fingerprint as fingerprintValue } from '../lib/fingerprint.js';
 
 const ORCHESTRATOR = { type: 'system', id: 'orchestrator' };
 const UNKNOWN_REQUESTER = { type: 'system', id: 'unknown-requester' };
 
-// JSON with object keys sorted, so {a,b} and {b,a} fingerprint the same.
-function stableJson(value) {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${stableJson(value[k])}`).join(',')}}`;
-  }
-  return JSON.stringify(value ?? null);
-}
-
 // What an operation asks for. Same id + same fingerprint = the same operation.
-const fingerprintOf = (tasks) => createHash('sha256')
-  .update(stableJson(tasks.map((t) => ({ id: t.id, capability: t.capability, input: t.input ?? null }))))
-  .digest('hex');
+const fingerprintOf = (tasks) => fingerprintValue(tasks.map((t) => ({ id: t.id, capability: t.capability, input: t.input ?? null })));
 
 const defaultSleep = (ms, signal) => new Promise((resolve, reject) => {
   if (signal.aborted) { reject(signal.reason); return; }
@@ -195,18 +183,25 @@ export function createOrchestrator({
       }
     }
 
-    // Up to 1 + maxRetries attempts on one agent. Returns { ok, output | error, attempts }.
+    // Up to 1 + maxRetries attempts on one agent.
+    // Returns { ok, output | error, attempts, taskFailed } — taskFailed means the
+    // agent is fine and the task should fail without trying anyone else.
     async function attemptOnAgent(agent, task) {
       for (let attempt = 1; ; attempt += 1) {
         try {
           return { ok: true, output: await callWithTimeout(agent, task), attempts: attempt };
         } catch (err) {
           if (operation.signal.aborted) throw operation.signal.reason;
-          const willRetry = classify(err) === 'retry' && attempt <= maxRetries;
+          const kind = classify(err);
+          const willRetry = kind === 'retry' && attempt <= maxRetries;
           log('task.attempt_failed', {
             subject: task.id,
-            detail: { agentId: agent.id, attempt, error: errorInfo(err), next: willRetry ? 'retry same agent' : 'reassign' },
+            detail: {
+              agentId: agent.id, attempt, error: errorInfo(err),
+              next: willRetry ? 'retry same agent' : kind === 'fail' ? 'fail task (agent is fine)' : 'reassign',
+            },
           });
+          if (kind === 'fail') return { ok: false, error: err, attempts: attempt, taskFailed: true };
           if (!willRetry) return { ok: false, error: err, attempts: attempt };
           const waitMs = retryDelay(err, attempt);
           log('task.retry_scheduled', { subject: task.id, detail: { agentId: agent.id, nextAttempt: attempt + 1, waitMs } });
@@ -282,6 +277,26 @@ export function createOrchestrator({
           record.tasks[task.id] = done;
           store.put(operationId, record);
           return done;
+        }
+
+        if (result.taskFailed) {
+          // The agent worked and reported that this task could not finish. It stays
+          // in rotation (a trial counts as passed: it answered properly); nobody
+          // else is tried; nothing is saved, so re-running the operation re-runs it.
+          const failure = errorInfo(result.error);
+          if (probe) {
+            registry.markHealthy(agent.id);
+            log('agent.recovered', { subject: agent.id, rationale: `Answered trial task ${task.id} properly; back in full rotation.` });
+          }
+          log('task.failed', {
+            subject: task.id,
+            rationale: `${agent.id} reported that the task could not finish (${failure.name}); the agent is fine, so no other agent is tried. Re-run the operation to try again.`,
+            detail: { agentId: agent.id, error: failure },
+          });
+          return {
+            id: task.id, capability: task.capability, status: 'failed', agentId: agent.id,
+            attempts: totalAttempts, triedAgents, error: failure,
+          };
         }
 
         triedAgents.push(agent.id);

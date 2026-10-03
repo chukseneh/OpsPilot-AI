@@ -20,8 +20,7 @@
 // that run. Who may see a saved report is checked again on every request.
 // Limit: identity is whatever the caller says it is — there is no login yet.
 
-import { createHash } from 'node:crypto';
-
+import { fingerprint } from '../lib/fingerprint.js';
 import { validateDataset, missingDataNotice } from './processData.js';
 import { analyse, AnalysisInterruptedError, resolveThresholds } from './analyse.js';
 import { buildReport, renderReportText } from './report.js';
@@ -42,14 +41,7 @@ const isNonEmpty = (v) => typeof v === 'string' && v.trim() !== '';
 // "Operations_Manager", "operations manager" and " operations  manager " are the same role.
 const normaliseRole = (role) => (typeof role === 'string' ? role.trim().toLowerCase().replace(/[_\s]+/g, ' ') : '');
 
-function stableJson(value) {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${stableJson(value[k])}`).join(',')}}`;
-  }
-  return JSON.stringify(value ?? null);
-}
-const fingerprintOf = (dataset, thresholds) => createHash('sha256').update(stableJson({ dataset, thresholds: thresholds ?? null })).digest('hex');
+const fingerprintOf = (dataset, thresholds) => fingerprint({ dataset, thresholds: thresholds ?? null });
 
 export function createAnalysisService({ audit, store, timeoutMs = DEFAULT_TIMEOUT_MS, roles = ANALYSIS_ROLES }) {
   const allowed = roles.map(normaliseRole);

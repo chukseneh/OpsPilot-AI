@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { createOrchestrator } from '../src/orchestration/orchestrator.js';
 import { defineAgent, createRegistry } from '../src/orchestration/agents.js';
 import { createMemoryResultStore, createFileResultStore } from '../src/orchestration/resultStore.js';
-import { AgentUnavailableError, NetworkError, RateLimitedError } from '../src/orchestration/errors.js';
+import { AgentUnavailableError, NetworkError, RateLimitedError, TaskFailedError } from '../src/orchestration/errors.js';
 import { createAuditLog, AuditWriteError } from '../src/audit/auditLog.js';
 
 const tempDir = () => mkdtempSync(join(tmpdir(), 'orch-'));
@@ -240,6 +240,31 @@ test('if every agent with a capability fails, that task fails cleanly and the re
   const last = audit.readAll().at(-1);
   assert.equal(last.action, 'operation.failed');
   assert.deepEqual(last.detail.failed, ['estimate-cost']);
+});
+
+// ---- "The task failed, but the agent is fine" ----
+
+test('a TaskFailedError fails the task at once, keeps the agent in rotation, and the operation re-runs', async () => {
+  const p1 = scripted('process-1', ['process'], (n) => {
+    if (n === 1) throw new TaskFailedError('ran out of time on this one');
+    return { ok: true };
+  });
+  const p2 = scripted('process-2', ['process']);
+  const store = createMemoryResultStore();
+  const { orchestrator, audit, actions } = setup([p1, p2], { store });
+
+  const first = await orchestrator.runOperation(oneTask('op-tf'));
+  assert.equal(first.status, 'failed');
+  assert.equal(first.tasks[0].agentId, 'process-1');
+  assert.equal(first.tasks[0].error.name, 'TaskFailedError');
+  assert.equal(p1.calls.length, 1, 'not retried');
+  assert.equal(p2.calls.length, 0, 'not reassigned');
+  assert.ok(!actions().includes('agent.marked_unhealthy'), 'the agent stays in rotation');
+  assert.match(audit.readAll().find((e) => e.action === 'task.failed').rationale, /the agent is fine/);
+
+  const second = await orchestrator.runOperation(oneTask('op-tf'));
+  assert.equal(second.replayed, false, 'a failed operation is re-run, not replayed');
+  assert.equal(second.status, 'completed');
 });
 
 // ---- Running it twice ----

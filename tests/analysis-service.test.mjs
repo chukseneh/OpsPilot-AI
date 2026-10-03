@@ -208,6 +208,35 @@ test('a request with no analysis id or no user is refused and logged', async () 
 
 // ---- Through the STORY-001 orchestrator ----
 
+test('an interrupted analysis under the orchestrator fails the operation (not saved as done), keeps the agent, and re-runs', async () => {
+  // Found in code review: "interrupted" used to come back as normal output, so the
+  // orchestrator saved the operation as completed and replayed "interrupted" for ever.
+  const audit = createAuditLog({ file: join(mkdtempSync(join(tmpdir(), 'svc-')), 'audit.jsonl') });
+  const analyses = createMemoryResultStore();
+  const operations = createMemoryResultStore();
+  const op = {
+    operationId: 'op-slow', requestedBy: { type: 'person', id: 'operations_manager' },
+    tasks: [{ id: 'analyse', capability: 'process', input: { user: analyst, dataset: dataset(20000) } }],
+  };
+
+  const hurried = createAnalysisService({ audit, store: analyses, timeoutMs: 5 });
+  const registry = createRegistry([createProcessAnalystAgent({ service: hurried })]);
+  const first = await createOrchestrator({ registry, audit, store: operations, timeoutMs: 60000 }).runOperation(op);
+  assert.equal(first.status, 'failed');
+  assert.equal(first.tasks[0].error.name, 'TaskFailedError');
+  assert.match(first.tasks[0].error.message, /interrupted \(timed out after 5 ms\)/);
+  assert.equal(registry.isHealthy('process-analyst'), true, 'the agent is not blamed');
+
+  // Same operation again, with enough time: it really re-runs, it is not replayed.
+  const patient = createAnalysisService({ audit, store: analyses, timeoutMs: 60000 });
+  const second = await createOrchestrator({
+    registry: createRegistry([createProcessAnalystAgent({ service: patient })]), audit, store: operations, timeoutMs: 90000,
+  }).runOperation(op);
+  assert.equal(second.replayed, false);
+  assert.equal(second.status, 'completed');
+  assert.equal(second.tasks[0].output.status, 'completed');
+});
+
 test('the process analyst runs as a real agent under the orchestrator; refused requests do not count as agent failures', async () => {
   const audit = createAuditLog({ file: join(mkdtempSync(join(tmpdir(), 'svc-')), 'audit.jsonl') });
   const service = createAnalysisService({ audit, store: createMemoryResultStore() });
