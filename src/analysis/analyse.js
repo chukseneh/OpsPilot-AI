@@ -18,8 +18,11 @@
 // Anything needs at least minOccurrences observations before it is flagged, so
 // one odd case cannot become a finding on its own.
 //
-// Interruption: analyse() is async and yields between cases. If `signal` aborts,
-// it throws AnalysisInterruptedError — never a half-finished result.
+// Interruption: analyse() is async and pauses every 200 cases and every 5,000
+// steps. If `signal` has aborted, it throws AnalysisInterruptedError — never a
+// half-finished result. Thresholds are checked first (resolveThresholds).
+
+import { formatDuration } from './report.js';
 
 export const DEFAULT_THRESHOLDS = Object.freeze({
   bottleneckRatio: 2,
@@ -30,7 +33,42 @@ export const DEFAULT_THRESHOLDS = Object.freeze({
   minOccurrences: 3,
 });
 
+// Pause to let a cancel or timeout land: after every 200 cases, and every 5,000
+// steps inside a case (one case can hold a whole log if every row shares an id).
 const YIELD_EVERY_CASES = 200;
+const YIELD_EVERY_STEPS = 5000;
+
+// What each threshold may be. Anything else is refused rather than silently
+// turning a rule off (e.g. a ratio of undefined would never flag anything).
+const THRESHOLD_RULES = {
+  bottleneckRatio: (v) => v > 0,
+  bottleneckShare: (v) => v > 0 && v <= 1,
+  automationMinFrequency: (v) => v > 0 && v <= 1,
+  automationMaxMedianMs: (v) => v >= 0,
+  automationMaxVariation: (v) => v >= 0,
+  minOccurrences: (v) => Number.isInteger(v) && v >= 1,
+};
+
+// Returns the full set of thresholds, or throws TypeError naming every bad one.
+// A key given as undefined means "use the default".
+export function resolveThresholds(thresholds = {}) {
+  if (thresholds === null || typeof thresholds !== 'object' || Array.isArray(thresholds)) {
+    throw new TypeError('Invalid analysis thresholds: expected an object');
+  }
+  const problems = [];
+  const resolved = { ...DEFAULT_THRESHOLDS };
+  for (const [key, value] of Object.entries(thresholds)) {
+    if (value === undefined) continue;
+    if (!(key in THRESHOLD_RULES)) { problems.push(`unknown threshold "${key}"`); continue; }
+    if (typeof value !== 'number' || !Number.isFinite(value) || !THRESHOLD_RULES[key](value)) {
+      problems.push(`"${key}" cannot be ${JSON.stringify(value)}`);
+      continue;
+    }
+    resolved[key] = value;
+  }
+  if (problems.length) throw new TypeError(`Invalid analysis thresholds: ${problems.join('; ')}`);
+  return Object.freeze(resolved);
+}
 
 export class AnalysisInterruptedError extends Error {
   constructor(message, options) {
@@ -72,12 +110,23 @@ const topCases = (pairs, n = 3) => [...pairs]
 
 export async function analyse(validation, { thresholds = {}, signal } = {}) {
   if (!validation?.ok) throw new TypeError('analyse() needs a validated data set: call validateDataset() and check ok first');
-  const t = { ...DEFAULT_THRESHOLDS, ...thresholds };
+  const t = resolveThresholds(thresholds);
 
   const checkpoint = async (where) => {
     if (signal?.aborted) {
       throw new AnalysisInterruptedError(`Analysis interrupted ${where}`, { cause: signal.reason });
     }
+  };
+  let stepsSincePause = 0;
+  const pause = async (where) => {
+    stepsSincePause = 0;
+    await new Promise((r) => setImmediate(r));
+    await checkpoint(where);
+  };
+  // Call once per unit of work; `where` is a function so the message is only built when used.
+  const tick = async (where) => {
+    stepsSincePause += 1;
+    if (stepsSincePause >= YIELD_EVERY_STEPS) await pause(where());
   };
   await checkpoint('before it started');
 
@@ -107,17 +156,20 @@ export async function analyse(validation, { thresholds = {}, signal } = {}) {
 
     // Nothing below may depend on the order rows appear in the file: steps that
     // start at the same instant are concurrent, and are treated identically.
+    const where = () => `while reading case ${processed + 1} of ${byCase.size}`;
     let groupStart = null; // start time of the group of steps being processed
     let endBeforeGroup = null; // latest end among steps that started BEFORE that group
     let latestEnd = -Infinity; // latest end among all steps processed so far
-    events.forEach((e, i) => {
+    const caseByActivity = new Map(); // activity → this case's occurrences, in time order
+    for (const e of events) {
       const s = stat(e.activity);
       const duration = e.end - e.start;
       s.durations.push(duration);
       s.durationsByCase.push({ caseId, ms: duration });
       s.cases.add(caseId);
       s.actors.add(e.actor);
-      s.perCase.set(caseId, [...(s.perCase.get(caseId) ?? []), e]);
+      if (!caseByActivity.has(e.activity)) caseByActivity.set(e.activity, []);
+      caseByActivity.get(e.activity).push(e);
 
       if (e.start !== groupStart) { // events are sorted, so everything seen so far started earlier
         groupStart = e.start;
@@ -130,23 +182,31 @@ export async function analyse(validation, { thresholds = {}, signal } = {}) {
         s.waitsByCase.push({ caseId, ms: wait });
       }
       latestEnd = Math.max(latestEnd, e.end);
+      await tick(where);
+    }
 
-      // Same activity, different person, sharing time: duplicated effort. Each
-      // pair is counted once; zero-length steps share no time.
-      for (const other of events.slice(0, i)) {
-        const overlapMs = Math.min(e.end, other.end) - Math.max(e.start, other.start);
-        if (other.activity === e.activity && other.actor !== e.actor && overlapMs > 0) {
-          if (!parallel.has(e.activity)) parallel.set(e.activity, []);
-          parallel.get(e.activity).push({ caseId, overlapMs, actors: [other.actor, e.actor].sort() });
+    for (const [activity, occurrences] of caseByActivity) {
+      stat(activity).perCase.set(caseId, occurrences);
+      // Same activity, different person, sharing time: duplicated effort. A sweep
+      // in time order: only occurrences still running can overlap the next one.
+      // Each pair is counted once; zero-length steps share no time.
+      const running = [];
+      for (const e of occurrences) {
+        for (let k = running.length - 1; k >= 0; k -= 1) if (running[k].end <= e.start) running.splice(k, 1);
+        for (const other of running) {
+          const overlapMs = Math.min(e.end, other.end) - Math.max(e.start, other.start);
+          if (other.actor !== e.actor && overlapMs > 0) {
+            if (!parallel.has(activity)) parallel.set(activity, []);
+            parallel.get(activity).push({ caseId, overlapMs, actors: [other.actor, e.actor].sort() });
+          }
         }
+        if (e.end > e.start) running.push(e);
+        await tick(where);
       }
-    });
+    }
 
     processed += 1;
-    if (processed % YIELD_EVERY_CASES === 0) {
-      await new Promise((r) => setImmediate(r)); // let a cancel or timeout land
-      await checkpoint(`after ${processed} of ${byCase.size} cases`);
-    }
+    if (processed % YIELD_EVERY_CASES === 0) await pause(`after ${processed} of ${byCase.size} cases`);
   }
   await checkpoint('after reading the cases');
 
@@ -193,8 +253,19 @@ export async function analyse(validation, { thresholds = {}, signal } = {}) {
     // "parallel" kind below, not counted twice.
     const extra = [];
     for (const [caseId, evs] of s.perCase) {
-      const again = evs.filter((e) => evs.some((p) => p !== e && p.start < e.start && p.end <= e.start));
+      // evs are in time order. Walk them a start-time group at a time, keeping the
+      // earliest end among occurrences that started strictly earlier.
+      const again = [];
+      let earliestEndBefore = Infinity;
+      for (let i = 0; i < evs.length;) {
+        let j = i;
+        while (j < evs.length && evs[j].start === evs[i].start) j += 1;
+        for (let k = i; k < j; k += 1) if (earliestEndBefore <= evs[k].start) again.push(evs[k]);
+        for (let k = i; k < j; k += 1) earliestEndBefore = Math.min(earliestEndBefore, evs[k].end);
+        i = j;
+      }
       if (again.length) extra.push({ caseId, ms: sum(again.map((e) => e.end - e.start)), again: again.length });
+      await tick(() => 'while finding duplicates');
     }
     if (extra.length) {
       duplicates.push({
@@ -234,7 +305,7 @@ export async function analyse(validation, { thresholds = {}, signal } = {}) {
       frequency: round2(frequency), medianMs: med, variation: round2(cv), totalMs: sum(s.durations), distinctActors: s.actors.size,
       reasons: [
         `happens in ${Math.round(frequency * 100)}% of cases`,
-        `usually takes ${Math.round(med / 60000)} min or less`,
+        `has a median duration of ${formatDuration(med)}`,
         `takes a consistent time (variation ${round2(cv)})`,
       ],
     });

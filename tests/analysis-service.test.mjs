@@ -187,6 +187,15 @@ test('if the audit log cannot be written, the analysis does not run', async () =
   assert.equal(store.get('AN-12'), null);
 });
 
+test('invalid thresholds are refused as a bad request before anything is analysed', async () => {
+  const { service, actions } = setup();
+  await assert.rejects(
+    service.runAnalysis({ analysisId: 'AN-14', user: analyst, dataset: dataset(), thresholds: { bottleneckRatio: 'two' } }),
+    (err) => err instanceof AnalysisRequestError && /"bottleneckRatio" cannot be "two"/.test(err.message),
+  );
+  assert.deepEqual(actions('AN-14'), ['analysis.requested', 'analysis.rejected']);
+});
+
 test('a request with no analysis id or no user is refused and logged', async () => {
   const { service, audit } = setup();
   await assert.rejects(service.runAnalysis({ user: analyst, dataset: dataset() }), /analysisId/);

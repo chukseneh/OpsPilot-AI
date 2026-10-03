@@ -21,14 +21,23 @@ export const MIN_CASES = 3;
 
 // ISO 8601 with an explicit time zone. "2026-09-01 09:00" is refused: without a
 // zone the same text means different instants on different machines.
-const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
+const ISO_WITH_ZONE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(?:Z|([+-])(\d{2}):(\d{2}))$/;
 
 const isBlank = (v) => v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
+const daysInMonth = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 
+// Returns { ms } for a real instant, or { problem } saying why not. Every part is
+// range-checked first: JavaScript would quietly turn 30 February into 2 March and
+// 24:00 into the next day, and this module never guesses.
 function parseTimestamp(value) {
-  if (typeof value !== 'string' || !ISO_WITH_ZONE.test(value)) return null;
-  const ms = Date.parse(value);
-  return Number.isNaN(ms) ? null : ms;
+  const m = typeof value === 'string' ? ISO_WITH_ZONE.exec(value) : null;
+  if (!m) return { problem: 'is not an ISO 8601 timestamp with a time zone' };
+  const [y, mo, d, h, mi, s = '0', , oh = '0', om = '0'] = m.slice(1);
+  const n = (x) => Number(x);
+  const real = n(mo) >= 1 && n(mo) <= 12 && n(d) >= 1 && n(d) <= daysInMonth(n(y), n(mo))
+    && n(h) <= 23 && n(mi) <= 59 && n(s) <= 59 && n(oh) <= 14 && n(om) <= 59;
+  if (!real) return { problem: 'is not a real date and time (check the day, month, hour and time-zone offset)' };
+  return { ms: Date.parse(value) };
 }
 
 // Returns { ok, process, events, problems, summary }.
@@ -64,10 +73,12 @@ export function validateDataset(dataset, { minCases = MIN_CASES } = {}) {
     for (const field of REQUIRED_FIELDS) {
       if (isBlank(raw[field])) { rowProblem(field, 'is missing'); rowOk = false; }
     }
-    const start = isBlank(raw.startedAt) ? null : parseTimestamp(raw.startedAt);
-    const end = isBlank(raw.endedAt) ? null : parseTimestamp(raw.endedAt);
-    if (!isBlank(raw.startedAt) && start === null) { rowProblem('startedAt', 'is not an ISO 8601 timestamp with a time zone'); rowOk = false; }
-    if (!isBlank(raw.endedAt) && end === null) { rowProblem('endedAt', 'is not an ISO 8601 timestamp with a time zone'); rowOk = false; }
+    const parsedStart = isBlank(raw.startedAt) ? null : parseTimestamp(raw.startedAt);
+    const parsedEnd = isBlank(raw.endedAt) ? null : parseTimestamp(raw.endedAt);
+    if (parsedStart?.problem) { rowProblem('startedAt', parsedStart.problem); rowOk = false; }
+    if (parsedEnd?.problem) { rowProblem('endedAt', parsedEnd.problem); rowOk = false; }
+    const start = parsedStart?.ms ?? null;
+    const end = parsedEnd?.ms ?? null;
     if (start !== null && end !== null && end < start) { rowProblem('endedAt', 'is before startedAt'); rowOk = false; }
 
     if (rowOk) {

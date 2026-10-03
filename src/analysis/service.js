@@ -23,7 +23,7 @@
 import { createHash } from 'node:crypto';
 
 import { validateDataset, missingDataNotice } from './processData.js';
-import { analyse, AnalysisInterruptedError } from './analyse.js';
+import { analyse, AnalysisInterruptedError, resolveThresholds } from './analyse.js';
 import { buildReport, renderReportText } from './report.js';
 
 export const ANALYSIS_ROLES = Object.freeze(['process analyst', 'operations manager']);
@@ -85,7 +85,15 @@ export function createAnalysisService({ audit, store, timeoutMs = DEFAULT_TIMEOU
       throw new PermissionDeniedError(why);
     }
 
-    // ---- 3. Already running, or already done? ----
+    // ---- 3. Are the settings valid? A bad threshold would silently switch a rule off. ----
+    try {
+      resolveThresholds(thresholds);
+    } catch (err) {
+      log('analysis.rejected', { rationale: err.message });
+      throw new AnalysisRequestError(`Analysis ${analysisId} rejected: ${err.message}`, { cause: err });
+    }
+
+    // ---- 4. Already running, or already done? ----
     const fingerprint = fingerprintOf(dataset, thresholds);
     const conflict = () => {
       const why = 'This analysis id was already used with different data or settings; use a new id.';
@@ -113,7 +121,7 @@ export function createAnalysisService({ audit, store, timeoutMs = DEFAULT_TIMEOU
   }
 
   async function execute({ analysisId, dataset, thresholds, signal, fingerprint, actor, log }) {
-    // ---- 4. Is the data complete? If not, say exactly what is missing. ----
+    // ---- 5. Is the data complete? If not, say exactly what is missing. ----
     const validation = validateDataset(dataset);
     if (!validation.ok) {
       log('analysis.missing_data', {
@@ -123,7 +131,7 @@ export function createAnalysisService({ audit, store, timeoutMs = DEFAULT_TIMEOU
       return { status: 'missing_data', analysisId, notice: missingDataNotice(validation), problems: validation.problems, replayed: false };
     }
 
-    // ---- 5. Analyse, within a time limit and cancellable by the caller ----
+    // ---- 6. Analyse, within a time limit and cancellable by the caller ----
     log('analysis.started', { detail: { process: validation.process, cases: validation.summary.cases, events: validation.events.length, timeoutMs } });
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(new Error(`timed out after ${timeoutMs} ms`)), timeoutMs);
@@ -150,7 +158,7 @@ export function createAnalysisService({ audit, store, timeoutMs = DEFAULT_TIMEOU
       signal?.removeEventListener('abort', onCallerAbort);
     }
 
-    // ---- 6. Report. Logged before it is saved and returned: no unrecorded result. ----
+    // ---- 7. Report. Logged before it is saved and returned: no unrecorded result. ----
     const report = buildReport(analysis, { analysisId, requestedBy: actor });
     const result = { status: 'completed', analysisId, report, text: renderReportText(report), replayed: false };
     log('analysis.completed', {

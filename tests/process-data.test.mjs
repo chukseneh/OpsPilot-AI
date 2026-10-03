@@ -61,6 +61,22 @@ test('timestamps must be ISO 8601 with a time zone, and must not end before they
     .some((p) => p.field === 'startedAt'), false, 'an explicit offset is fine');
 });
 
+test('impossible dates and times are refused, not rolled over into real ones', () => {
+  // Found in code review: JavaScript quietly turns 30 February into 2 March.
+  const withStart = (startedAt) => {
+    const data = complete();
+    data.events[0].startedAt = startedAt;
+    // Only problems with startedAt itself: a 2028 start is (correctly) after this row's 2026 end.
+    return validateDataset(data).problems.filter((p) => p.row === 1 && p.field === 'startedAt').map((p) => p.problem);
+  };
+  for (const bad of ['2026-02-30T09:00:00Z', '2026-02-29T09:00:00Z', '2026-04-31T09:00:00Z', '2026-09-01T24:00:00Z',
+    '2026-09-01T09:60:00Z', '2026-13-01T09:00:00Z', '2026-09-01T09:00:00+15:00', '2026-09-00T09:00:00Z']) {
+    assert.deepEqual(withStart(bad), ['is not a real date and time (check the day, month, hour and time-zone offset)'], bad);
+  }
+  assert.deepEqual(withStart('2028-02-29T09:00:00Z'), [], 'a leap day is real');
+  assert.deepEqual(withStart('2026-09-01T09:00:00+14:00'), [], 'the largest real offset');
+});
+
 test('a data set too small or malformed to analyse is refused with a dataset-level reason', () => {
   assert.match(validateDataset({ process: 'X', events: complete().events.slice(0, 4) }).problems[0].problem, /only 2 complete cases; at least 3/);
   assert.match(validateDataset({ process: 'X', events: [] }).problems[0].problem, /empty/);

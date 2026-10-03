@@ -52,7 +52,7 @@ test('suggests frequent, short, consistent steps for automation — and not the 
   const receive = r.automationCandidates.find((c) => c.activity === 'Receive');
   assert.equal(receive.frequency, 1);
   assert.equal(receive.variation, 0);
-  assert.deepEqual(receive.reasons, ['happens in 100% of cases', 'usually takes 5 min or less', 'takes a consistent time (variation 0)']);
+  assert.deepEqual(receive.reasons, ['happens in 100% of cases', 'has a median duration of 5 min', 'takes a consistent time (variation 0)']);
 });
 
 test('finds repeated work and parallel duplicated effort, without counting one as the other', async () => {
@@ -134,6 +134,42 @@ test('an analysis cancelled part-way stops at the next checkpoint', async () => 
   const running = analyse(v, { signal: controller.signal });
   controller.abort(new Error('timeout'));
   await assert.rejects(running, (err) => err instanceof AnalysisInterruptedError && /after 200 of 1000 cases/.test(err.message));
+});
+
+test('a sub-minute step is described in seconds, not as "0 min"', async () => {
+  const cases = Array.from({ length: 4 }, () => [['Stamp', 0, 1 / 3], ['File', 5, 6]]); // Stamp takes 20 s
+  const r = await analyse(log(cases));
+  assert.ok(r.automationCandidates.find((c) => c.activity === 'Stamp').reasons.includes('has a median duration of 20 s'));
+});
+
+test('bad thresholds are refused instead of silently switching a rule off', async () => {
+  const v = log(invoiceCases());
+  await assert.rejects(analyse(v, { thresholds: { bottleneckRatio: null } }), /"bottleneckRatio" cannot be null/);
+  await assert.rejects(analyse(v, { thresholds: { bottleneckShare: 1.5, minOccurrences: 2.5 } }),
+    /"bottleneckShare" cannot be 1\.5; "minOccurrences" cannot be 2\.5/);
+  await assert.rejects(analyse(v, { thresholds: { bottlenekRatio: 3 } }), /unknown threshold "bottlenekRatio"/);
+  const r = await analyse(v, { thresholds: { bottleneckRatio: undefined } }); // undefined = use the default
+  assert.equal(r.thresholds.bottleneckRatio, 2);
+});
+
+test('one huge case can still be interrupted part-way through', async () => {
+  // Found in code review: the cancel check only ran between cases, so a log where
+  // every row shared one case id could not be stopped.
+  const huge = Array.from({ length: 30000 }, (_, i) => ['Poll', i, i + 0.5]);
+  const v = log([huge, [['Poll', 0, 1]], [['Poll', 0, 1]]]);
+  const controller = new AbortController();
+  const running = analyse(v, { signal: controller.signal });
+  controller.abort(new Error('timeout'));
+  await assert.rejects(running, (err) => err instanceof AnalysisInterruptedError && /while reading case 1 of 3/.test(err.message));
+});
+
+test('a case with thousands of overlapping and repeated steps is analysed quickly', async () => {
+  // Pair counting and repeat detection used to compare every step with every other.
+  const busy = Array.from({ length: 20000 }, (_, i) => ['Poll', i, i + 0.5, `bot-${i % 2}`]);
+  const started = Date.now();
+  const r = await analyse(log([busy, [['Poll', 0, 1]], [['Poll', 0, 1]]]));
+  assert.ok(Date.now() - started < 5000, `took ${Date.now() - started} ms`);
+  assert.equal(r.duplicates.find((d) => d.kind === 'repeated').extraOccurrences, 19999);
 });
 
 test('refuses data that has not been validated', async () => {

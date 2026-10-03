@@ -26,8 +26,7 @@ const MANAGER = { type: 'person', id: 'operations_manager' };
 
 export async function runAnalysisDemo({ outDir, print = console.log } = {}) {
   const dir = outDir ?? mkdtempSync(join(tmpdir(), 'opspilot-analysis-'));
-  const auditFile = join(dir, 'audit.jsonl');
-  const audit = createAuditLog({ file: auditFile });
+  const audit = createAuditLog({ file: join(dir, 'audit.jsonl') });
   const service = createAnalysisService({ audit, store: createFileResultStore({ file: join(dir, 'analyses.json') }) });
   const orchestrator = createOrchestrator({
     registry: createRegistry([createProcessAnalystAgent({ service })]),
@@ -35,32 +34,43 @@ export async function runAnalysisDemo({ outDir, print = console.log } = {}) {
     store: createFileResultStore({ file: join(dir, 'operations.json') }),
     timeoutMs: 60000,
   });
-  const run = async (operationId, user, dataset) => (await orchestrator.runOperation({
-    operationId, requestedBy: MANAGER,
-    tasks: [{ id: 'analyse', capability: 'process', input: { user, dataset } }],
-  })).tasks[0].output;
+  const firstSeq = audit.readAll().length; // entries before this run (a reused --out folder has some)
+  const run = async (operationId, user, dataset) => {
+    const op = await orchestrator.runOperation({
+      operationId, requestedBy: MANAGER,
+      tasks: [{ id: 'analyse', capability: 'process', input: { user, dataset } }],
+    });
+    const task = op.tasks[0];
+    // A task that failed (agent unavailable, timed out) has no output: report why.
+    if (task.status !== 'completed') {
+      return { status: 'task_failed', message: `The analysis task failed: ${task.error?.name}: ${task.error?.message}` };
+    }
+    return { ...task.output, replayedFromEarlierRun: op.replayed };
+  };
+  const show = (r, body) => (r.status === 'task_failed' ? r.message : body());
 
   const rule = (title) => print(`\n${'='.repeat(78)}\n${title}\n${'='.repeat(78)}`);
   print(`OpsPilot AI — process analysis demo. Data: ${SAMPLE_LABEL}.`);
 
   rule('1. analyst-7 (process analyst) analyses 30 invoice-approval cases');
   const full = await run('demo-analysis-full', ANALYST, sampleInvoiceProcess());
-  print(full.status === 'completed' ? full.text : `Unexpected: ${full.status}`);
+  print(show(full, () => (full.status === 'completed' ? full.text : `Unexpected: ${full.status}`)));
 
   rule('2. The same request with gaps in the data');
   const gaps = await run('demo-analysis-gaps', ANALYST, sampleWithGaps());
-  print(`Status: ${gaps.status}\n\n${gaps.notice}`);
+  print(show(gaps, () => `Status: ${gaps.status}\n\n${gaps.notice}`));
 
   rule('3. intern-3 asks for an analysis');
   const refused = await run('demo-analysis-intern', INTERN, sampleInvoiceProcess());
-  print(`Status: ${refused.status}\n${refused.message}`);
+  print(show(refused, () => `Status: ${refused.status}\n${refused.message}`));
 
-  rule('4. Audit trail for the analyses (every entry: timestamp + user id)');
-  const entries = createAuditLog({ file: auditFile }).readAll().filter((e) => e.action.startsWith('analysis.'));
+  rule('4. Audit trail for this run (every entry: timestamp + user id)');
+  const entries = audit.readAll().slice(firstSeq).filter((e) => e.action.startsWith('analysis.'));
+  if (!entries.length) print('  (No new analysis entries: this folder already held these results, so the orchestrator replayed them.)');
   for (const e of entries) {
     print(`  ${e.at}  ${e.actor.id.padEnd(10)} ${e.action.padEnd(22)} ${e.correlationId}${e.rationale ? ` — ${e.rationale}` : ''}`);
   }
-  const check = createAuditLog({ file: auditFile }).verify();
+  const check = audit.verify();
   print(`\nAudit chain: ${check.ok ? `verified — ${check.count} entries (orchestrator + analysis), none edited or removed` : `BROKEN at #${check.brokenAt}`}`);
   print(`Files: ${dir}`);
 

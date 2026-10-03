@@ -31,3 +31,14 @@ test('demo: report finds the planted problems, gaps give a notice, intern is ref
   assert.ok(r.entries.every((e) => e.actor.type === 'person' && e.actor.id && e.at));
   assert.equal(r.audit.ok, true);
 });
+
+test('demo run twice in one folder replays, and does not show the first run\'s audit entries as new', async () => {
+  const outDir = mkdtempSync(join(tmpdir(), 'an-demo-'));
+  await runAnalysisDemo({ outDir, print: () => {} });
+  const printed = [];
+  const second = await runAnalysisDemo({ outDir, print: (line) => printed.push(line) });
+  assert.equal(second.full.replayedFromEarlierRun, true);
+  assert.deepEqual(second.entries, []);
+  assert.ok(printed.some((l) => /No new analysis entries/.test(l)));
+  assert.equal(second.audit.ok, true);
+});
