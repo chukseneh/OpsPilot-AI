@@ -57,6 +57,11 @@
       "statement": "Add a read-only list() to the result stores and share role-name matching in src/lib/roles.js.",
       "rationale": "The dashboard must list saved analyses, which the stores could not do; one shared role rule stops the dashboard and the analysis service disagreeing about who a role is. Both changes approved by the student.",
       "evidence": "src/orchestration/resultStore.js"
+    },
+    {
+      "statement": "Read each request address exactly as sent, so an address starting with \"//\" is a path (404) rather than another host.",
+      "rationale": "Found by a randomised stress test: \"//x/...\" was read as host x, path \"/...\", so the server answered addresses it should not and logged the wrong address.",
+      "evidence": "tests/dashboard-server.test.mjs"
     }
   ],
   "limitations": [
@@ -82,12 +87,34 @@
     }
   ],
   "demonstrationEvidence": [
-    { "kind": "test", "ref": "tests/dashboard-server.test.mjs" },
-    { "kind": "test", "ref": "tests/dashboard-data.test.mjs" },
-    { "kind": "test", "ref": "tests/dashboard-render.test.mjs" },
-    { "kind": "test", "ref": "tests/result-store.test.mjs" },
-    { "kind": "test", "ref": "tests/dashboard-demo.test.mjs" },
-    { "kind": "demo", "ref": "src/demo/dashboard.js" }
+    {
+      "kind": "test",
+      "ref": "tests/dashboard-server.test.mjs"
+    },
+    {
+      "kind": "test",
+      "ref": "tests/dashboard-data.test.mjs"
+    },
+    {
+      "kind": "test",
+      "ref": "tests/dashboard-render.test.mjs"
+    },
+    {
+      "kind": "test",
+      "ref": "tests/result-store.test.mjs"
+    },
+    {
+      "kind": "test",
+      "ref": "tests/dashboard-demo.test.mjs"
+    },
+    {
+      "kind": "demo",
+      "ref": "src/demo/dashboard.js"
+    },
+    {
+      "kind": "test",
+      "ref": "tests/dashboard.stress.test.mjs"
+    }
   ],
   "measurementEvents": []
 }

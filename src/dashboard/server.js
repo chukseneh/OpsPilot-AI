@@ -96,7 +96,10 @@ export function createDashboardServer({ data, audit, roles = DASHBOARD_ROLES, re
     const user = readUser(req);
     const actor = user ? { type: 'person', id: user.id } : ANONYMOUS;
     const log = (action, fields = {}, who = actor) => audit.append({ correlationId, actor: who, action, ...fields });
-    const url = new URL(req.url, 'http://dashboard.local');
+    // Read the address exactly as sent. new URL(req.url, base) would treat "//x/..."
+    // as a different HOST and quietly turn it into "/..." — serving the wrong page
+    // and logging the wrong address.
+    const url = new URL(`http://dashboard.local${req.url}`);
     const path = url.pathname;
     const refuse = (status, title, message, action = 'dashboard.denied') => {
       log(action, { subject: path, rationale: message, detail: { status, role: user?.role ?? null } });

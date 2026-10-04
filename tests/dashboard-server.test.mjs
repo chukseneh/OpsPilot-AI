@@ -141,6 +141,20 @@ test('not signed in gets 401, a role that is not allowed gets 403, and no data i
   assert.deepEqual(denials.map((e) => [e.actor.id, e.detail.status]), [['anonymous', 401], ['intern-3', 403], ['intern-3', 403]]);
 });
 
+test('addresses starting with "//" are not misread as another host', async () => {
+  // Found by the stress test: "//double" used to be read as host "double", path "/",
+  // so it served the dashboard and logged the wrong address.
+  const { url, audit } = await start({ store: await storeWith(['AN-1']) });
+  const cookie = await signIn(url, 'da-1', 'data analyst');
+  for (const path of ['//double', '//x/analyses/AN-1']) {
+    const res = await get(url, path, cookie);
+    assert.equal(res.status, 404, path);
+    assert.doesNotMatch(await res.text(), /Manager approval/);
+  }
+  const notFound = audit.readAll().filter((e) => e.action === 'dashboard.not_found');
+  assert.deepEqual(notFound.map((e) => e.subject), ['//double', '//x/analyses/AN-1']);
+});
+
 test('a forged or garbled cookie counts as not signed in', async () => {
   const { url } = await start({ store: await storeWith(['AN-1']) });
   assert.equal((await get(url, '/', 'opspilot_demo_user=not-base64-json')).status, 401);
