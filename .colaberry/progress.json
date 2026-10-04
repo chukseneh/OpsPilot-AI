@@ -509,21 +509,36 @@
       "criteria": [
         {
           "text": "Given process analysis data is available, when I access the dashboard, then I see the analysis results and automation opportunities.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given no data is available, when I access the dashboard, then I see a message indicating no data is present.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: The system logs all dashboard accesses and data views for audit purposes.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/dashboard/data.js",
+        "src/dashboard/render.js",
+        "src/dashboard/server.js",
+        "src/lib/roles.js",
+        "src/orchestration/resultStore.js",
+        "src/analysis/service.js",
+        "src/demo/dashboard.js",
+        ".colaberry/enrichment/STORY-011.json"
+      ],
+      "tests_added": [
+        "tests/result-store.test.mjs",
+        "tests/dashboard-data.test.mjs",
+        "tests/dashboard-render.test.mjs",
+        "tests/dashboard-server.test.mjs",
+        "tests/dashboard-demo.test.mjs"
+      ],
+      "notes": "Process analysis dashboard: a local web server (127.0.0.1) showing saved STORY-002 reports — latest results and automation opportunities, every analysis, full reports; a no-data message; 401/403 for unauthorised access, 503 when data cannot be read, 500 on a rendering error; every request audited with user id and timestamp before anything is shown. Demo: node src/demo/dashboard.js (synthetic data; demo sign-in, not real authentication).",
+      "updated_at": "2026-10-04T00:59:07.215Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,

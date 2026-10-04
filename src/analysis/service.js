@@ -21,6 +21,7 @@
 // Limit: identity is whatever the caller says it is — there is no login yet.
 
 import { fingerprint } from '../lib/fingerprint.js';
+import { roleAllowed } from '../lib/roles.js';
 import { validateDataset, missingDataNotice } from './processData.js';
 import { analyse, AnalysisInterruptedError, resolveThresholds } from './analyse.js';
 import { buildReport, renderReportText } from './report.js';
@@ -38,13 +39,10 @@ export class AnalysisRequestError extends Error {
 
 const UNKNOWN_REQUESTER = { type: 'system', id: 'unknown-requester' };
 const isNonEmpty = (v) => typeof v === 'string' && v.trim() !== '';
-// "Operations_Manager", "operations manager" and " operations  manager " are the same role.
-const normaliseRole = (role) => (typeof role === 'string' ? role.trim().toLowerCase().replace(/[_\s]+/g, ' ') : '');
 
 const fingerprintOf = (dataset, thresholds) => fingerprint({ dataset, thresholds: thresholds ?? null });
 
 export function createAnalysisService({ audit, store, timeoutMs = DEFAULT_TIMEOUT_MS, roles = ANALYSIS_ROLES }) {
-  const allowed = roles.map(normaliseRole);
   const inFlight = new Map(); // analysisId → { promise, fingerprint }
 
   async function runAnalysis({ analysisId, user, dataset, thresholds, signal } = {}) {
@@ -71,7 +69,7 @@ export function createAnalysisService({ audit, store, timeoutMs = DEFAULT_TIMEOU
     });
 
     // ---- 2. May this user run (or read) an analysis? ----
-    if (!allowed.includes(normaliseRole(user.role))) {
+    if (!roleAllowed(user.role, roles)) {
       const why = `Role "${user.role ?? 'none'}" may not run process analysis; allowed roles: ${roles.join(', ')}.`;
       log('analysis.denied', { rationale: why });
       throw new PermissionDeniedError(why);

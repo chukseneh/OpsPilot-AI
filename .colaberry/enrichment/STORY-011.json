@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "1",
+  "projectId": "3704f65e-d372-4085-b821-5b5495f688d0",
+  "storyId": "STORY-011",
+  "projectTruthBaseRevision": 1,
+  "observedAt": "2026-10-04T01:05:00.000Z",
+  "sourceCommitSha": "0b1544d4d3c621c392f1998e876b831a3337b161",
+  "factProposals": [
+    {
+      "dimension": "outputs",
+      "value": "A process analysis dashboard (web pages served locally) showing the latest analysis's headline, counts, automation opportunities, bottlenecks and duplicated work, a table of every completed analysis, and each analysis's full report including method and limitations.",
+      "evidence": "src/dashboard/render.js"
+    },
+    {
+      "dimension": "data",
+      "value": "The dashboard reads only the reports the analysis service saved; analyses that never produced a report (missing data, interrupted) are not shown, and damaged saved records are skipped and counted on the page.",
+      "evidence": "src/dashboard/data.js"
+    },
+    {
+      "dimension": "approval_points",
+      "value": "Only the data analyst, process analyst and operations manager roles may view the dashboard; anyone not signed in gets 401 and any other role 403, and neither sees any data.",
+      "evidence": "src/dashboard/server.js"
+    },
+    {
+      "dimension": "security_context",
+      "value": "Every dashboard request (sign-in, sign-out, page views, refusals, not-found, data and rendering errors) is written to the hash-chained audit log with the user id or \"anonymous\" and a timestamp; page views record which analyses were shown. The entry is written before the page is sent, and if it cannot be written no data is shown. Pages carry a Content Security Policy that blocks all scripts.",
+      "evidence": "tests/dashboard-server.test.mjs"
+    },
+    {
+      "dimension": "exceptions",
+      "value": "If the saved analyses cannot be read the dashboard returns a 503 'could not load' page; if a page cannot be built it returns a complete 500 error page, never part of a page.",
+      "evidence": "src/dashboard/server.js"
+    },
+    {
+      "dimension": "actors",
+      "value": "The data analyst role appears as a dashboard viewer alongside the process analyst and operations manager.",
+      "evidence": "src/dashboard/server.js"
+    }
+  ],
+  "decisions": [
+    {
+      "statement": "Build the dashboard as a small server-side web app rather than a tab in the static Command Center.",
+      "rationale": "A static public page cannot check who is viewing or write to the audit log, so it could not meet the unauthorised-access path or the logging criterion.",
+      "evidence": "src/dashboard/server.js"
+    },
+    {
+      "statement": "Use a clearly labelled demo sign-in (user id and role kept in a cookie) as a stand-in for real authentication.",
+      "rationale": "The project has no login system yet. Chosen by the student before building; the permission check and audit trail are real.",
+      "evidence": "src/dashboard/server.js"
+    },
+    {
+      "statement": "Allow the data analyst, process analyst and operations manager roles.",
+      "rationale": "The data analyst owns the story; the other two already run analyses. Chosen by the student before building.",
+      "evidence": "src/dashboard/server.js"
+    },
+    {
+      "statement": "Add a read-only list() to the result stores and share role-name matching in src/lib/roles.js.",
+      "rationale": "The dashboard must list saved analyses, which the stores could not do; one shared role rule stops the dashboard and the analysis service disagreeing about who a role is. Both changes approved by the student.",
+      "evidence": "src/orchestration/resultStore.js"
+    }
+  ],
+  "limitations": [
+    {
+      "statement": "Sign-in is not authentication: the user id and role are whatever was typed, and the cookie is not signed. Anyone who can reach the server can claim an allowed role.",
+      "evidence": "src/dashboard/server.js"
+    },
+    {
+      "statement": "The server listens on 127.0.0.1 only and has no HTTPS; it is a local tool, not yet deployable for other people.",
+      "evidence": "src/dashboard/server.js"
+    },
+    {
+      "statement": "The data-read time limit only takes effect for a store that reads over a network; today's file store reads synchronously (a corrupted file is still caught).",
+      "evidence": "src/dashboard/data.js"
+    },
+    {
+      "statement": "Every request is audited, including browser requests such as /favicon.ico, so the log includes some not-found entries that are not user actions.",
+      "evidence": "src/dashboard/server.js"
+    },
+    {
+      "statement": "The dashboard has only been shown synthetic analyses; no real organisation's data has been displayed.",
+      "evidence": "src/demo/dashboard.js"
+    }
+  ],
+  "demonstrationEvidence": [
+    { "kind": "test", "ref": "tests/dashboard-server.test.mjs" },
+    { "kind": "test", "ref": "tests/dashboard-data.test.mjs" },
+    { "kind": "test", "ref": "tests/dashboard-render.test.mjs" },
+    { "kind": "test", "ref": "tests/result-store.test.mjs" },
+    { "kind": "test", "ref": "tests/dashboard-demo.test.mjs" },
+    { "kind": "demo", "ref": "src/demo/dashboard.js" }
+  ],
+  "measurementEvents": []
+}
