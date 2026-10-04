@@ -12,7 +12,7 @@ As a compliance officer, I want OpsPilot to perform risk assessments, so that I 
 
 ## How to build it
 
-Use Claude's risk-assessment skill to evaluate AI systems.
+Build the risk assessment in your own code, against the AI systems already in your inventory from STORY-004. For each registered system, identify its risks and put them into named categories you choose and can defend, then record a suggested mitigation for each one. Write every assessment run to a log with what was assessed, what was found and when, so the Trust line is satisfied by a real record rather than a claim. No external service and no pre-built skill is required for this story.
 
 ## Failure paths you must handle
 
