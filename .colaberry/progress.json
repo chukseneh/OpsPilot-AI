@@ -539,7 +539,7 @@
         "tests/dashboard.stress.test.mjs"
       ],
       "notes": "Process analysis dashboard: a local web server (127.0.0.1) showing saved STORY-002 reports — latest results and automation opportunities, every analysis, full reports; a no-data message; 401/403 for unauthorised access, 503 when data cannot be read, 500 on a rendering error; every request audited with user id and timestamp before anything is shown. Demo: node src/demo/dashboard.js (synthetic data; demo sign-in, not real authentication).",
-      "updated_at": "2026-10-04T01:19:27.726Z",
+      "updated_at": "2026-10-04T01:37:16.956Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,

@@ -67,6 +67,11 @@
       "statement": "Show a generic \"could not load\" message on the 503 page and keep the underlying error (which can name files) in the audit log only.",
       "rationale": "Found in code review: the raw storage error exposed internal file paths to users.",
       "evidence": "tests/dashboard-server.test.mjs"
+    },
+    {
+      "statement": "The file result store keeps records in a Map (so any string, including \"constructor\" and \"__proto__\", is a safe id) and retries replacing its file up to 5 times on Windows \"file busy\" errors.",
+      "rationale": "Found in code review: special ids returned built-in values or silently lost records, and a busy file could make a save fail after the audit log already recorded completion. Approved by the student as a change to STORY-001 code.",
+      "evidence": "tests/result-store.test.mjs"
     }
   ],
   "limitations": [
