@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runDashboardCheck } from '../src/demo/dashboard.js';
+import { runDashboardCheck, walkthroughPassed } from '../src/demo/dashboard.js';
 
 test('demo: anonymous 401, analyst sees results and automation opportunities, intern 403, no-data message, audit verifies', async () => {
   const r = await runDashboardCheck({ print: () => {} });
@@ -25,4 +25,10 @@ test('demo: anonymous 401, analyst sees results and automation opportunities, in
     ['dashboard.viewed', 'da-1'],
   ]);
   assert.equal(r.audit.ok, true);
+  assert.equal(walkthroughPassed(r), true);
+
+  // The exit code must catch a broken permission check, not just a working analyst view.
+  assert.equal(walkthroughPassed({ ...r, intern: { ...r.intern, status: 200 } }), false);
+  assert.equal(walkthroughPassed({ ...r, anonymous: { ...r.anonymous, status: 200 } }), false);
+  assert.equal(walkthroughPassed({ ...r, noData: { status: 200, lines: [] } }), false);
 });

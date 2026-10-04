@@ -62,6 +62,11 @@
       "statement": "Read each request address exactly as sent, so an address starting with \"//\" is a path (404) rather than another host.",
       "rationale": "Found by a randomised stress test: \"//x/...\" was read as host x, path \"/...\", so the server answered addresses it should not and logged the wrong address.",
       "evidence": "tests/dashboard-server.test.mjs"
+    },
+    {
+      "statement": "Show a generic \"could not load\" message on the 503 page and keep the underlying error (which can name files) in the audit log only.",
+      "rationale": "Found in code review: the raw storage error exposed internal file paths to users.",
+      "evidence": "tests/dashboard-server.test.mjs"
     }
   ],
   "limitations": [
@@ -84,6 +89,10 @@
     {
       "statement": "The dashboard has only been shown synthetic analyses; no real organisation's data has been displayed.",
       "evidence": "src/demo/dashboard.js"
+    },
+    {
+      "statement": "There is no rate limiting: anyone who can reach the server can send many requests, each writing an audit entry (addresses are cut to 200 characters). Because the audit log refuses all writes after a failed one, a full disk takes the dashboard down until restart. Acceptable while it listens on 127.0.0.1 only.",
+      "evidence": "src/dashboard/server.js"
     }
   ],
   "demonstrationEvidence": [

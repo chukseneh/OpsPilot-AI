@@ -49,6 +49,9 @@ class RequestProblem extends Error {
   constructor(status, message) { super(message); this.name = 'RequestProblem'; this.status = status; }
 }
 
+const MAX_LOGGED_CHARS = 200;
+const clip = (text) => (text.length > MAX_LOGGED_CHARS ? `${text.slice(0, MAX_LOGGED_CHARS)}… (${text.length} characters)` : text);
+
 const validField = (v) => typeof v === 'string' && v.trim() !== '' && v.length <= MAX_FIELD;
 
 function readUser(req) {
@@ -101,14 +104,17 @@ export function createDashboardServer({ data, audit, roles = DASHBOARD_ROLES, re
     // and logging the wrong address.
     const url = new URL(`http://dashboard.local${req.url}`);
     const path = url.pathname;
+    // What gets written to the log: long junk addresses are cut, so anonymous
+    // requests cannot grow the audit log by kilobytes each.
+    const shownPath = clip(path);
     const refuse = (status, title, message, action = 'dashboard.denied') => {
-      log(action, { subject: path, rationale: message, detail: { status, role: user?.role ?? null } });
+      log(action, { subject: shownPath, rationale: message, detail: { status, role: user?.role ?? null } });
       send(res, status, errorPage(user, status, title, message));
     };
 
     // ---- Public: sign in and out ----
     if (path === '/sign-in' && req.method === 'GET') {
-      log('dashboard.accessed', { subject: path }); // before rendering, so the access is recorded even if that fails
+      log('dashboard.accessed', { subject: shownPath }); // before rendering, so the access is recorded even if that fails
       return send(res, 200, render.renderSignIn({ roles }));
     }
     if (path === '/sign-in' && req.method === 'POST') {
@@ -123,25 +129,25 @@ export function createDashboardServer({ data, audit, roles = DASHBOARD_ROLES, re
       const role = form.get('role') ?? '';
       if (!validField(id) || !validField(role)) {
         const why = `Enter a user id and a role (each up to ${MAX_FIELD} characters).`;
-        log('dashboard.sign_in_rejected', { subject: path, rationale: why }, ANONYMOUS);
+        log('dashboard.sign_in_rejected', { subject: shownPath, rationale: why }, ANONYMOUS);
         return send(res, 400, render.renderSignIn({ error: why, roles }));
       }
       const who = { id: id.trim(), role: role.trim() };
-      log('dashboard.signed_in', { subject: path, detail: { role: who.role } }, { type: 'person', id: who.id });
+      log('dashboard.signed_in', { subject: shownPath, detail: { role: who.role } }, { type: 'person', id: who.id });
       const value = Buffer.from(JSON.stringify(who)).toString('base64url');
       return send(res, 303, '', { Location: '/', 'Set-Cookie': `${COOKIE}=${value}; HttpOnly; SameSite=Lax; Path=/; Max-Age=28800` });
     }
     if (path === '/sign-out' && req.method === 'POST') {
-      log('dashboard.signed_out', { subject: path });
+      log('dashboard.signed_out', { subject: shownPath });
       return send(res, 303, '', { Location: '/sign-in', 'Set-Cookie': `${COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0` });
     }
 
     // ---- Everything else needs a signed-in user with an allowed role ----
     const isDashboard = path === '/';
     const analysisMatch = /^\/analyses\/([^/]+)$/.exec(path);
-    if (!isDashboard && !analysisMatch) return refuse(404, 'Page not found', `There is no page at ${path}.`, 'dashboard.not_found');
+    if (!isDashboard && !analysisMatch) return refuse(404, 'Page not found', `There is no page at ${shownPath}.`, 'dashboard.not_found');
     if (req.method !== 'GET') {
-      log('dashboard.denied', { subject: path, rationale: `${req.method} is not allowed here.`, detail: { status: 405 } });
+      log('dashboard.denied', { subject: shownPath, rationale: `${req.method} is not allowed here.`, detail: { status: 405 } });
       return send(res, 405, errorPage(user, 405, 'Not allowed', `${req.method} is not allowed here.`), { Allow: 'GET' });
     }
     if (!user) return refuse(401, 'Please sign in', 'Sign in to see the process analysis dashboard.');
@@ -153,10 +159,9 @@ export function createDashboardServer({ data, audit, roles = DASHBOARD_ROLES, re
     let view;
     try {
       if (isDashboard) {
-        const { analyses, skipped } = await data.listAnalyses();
-        const latest = analyses.length ? await data.getAnalysis(analyses[0].analysisId) : null;
-        if (analyses.length && !latest) throw new DashboardDataError('The latest analysis could not be loaded');
-        view = { kind: 'dashboard', analyses, skipped, latest };
+        const { analyses, skipped, latestReport } = await data.listAnalyses();
+        if (analyses.length && !latestReport) throw new DashboardDataError('The latest analysis could not be loaded');
+        view = { kind: 'dashboard', analyses, skipped, latest: latestReport };
       } else {
         let analysisId;
         try {
@@ -165,13 +170,15 @@ export function createDashboardServer({ data, audit, roles = DASHBOARD_ROLES, re
           return refuse(400, 'Bad address', 'That analysis address is not valid.', 'dashboard.not_found');
         }
         const report = await data.getAnalysis(analysisId);
-        if (!report) return refuse(404, 'Analysis not found', `There is no completed analysis called ${analysisId}.`, 'dashboard.not_found');
+        if (!report) return refuse(404, 'Analysis not found', `There is no completed analysis called ${clip(analysisId)}.`, 'dashboard.not_found');
         view = { kind: 'analysis', report };
       }
     } catch (err) {
       if (!(err instanceof DashboardDataError)) throw err;
-      log('dashboard.data_error', { subject: path, rationale: err.message });
-      return send(res, 503, errorPage(user, 503, 'Could not load the data', `The analysis data could not be loaded just now (${err.message}). Try again shortly.`));
+      // The details (which may name files or parser positions) go to the audit log only.
+      log('dashboard.data_error', { subject: shownPath, rationale: err.message });
+      return send(res, 503, errorPage(user, 503, 'Could not load the data',
+        'The analysis data could not be loaded just now. The problem has been recorded; try again shortly.'));
     }
 
     // ---- Build the page; a failure here must not send half a page ----
@@ -182,13 +189,13 @@ export function createDashboardServer({ data, audit, roles = DASHBOARD_ROLES, re
       else html = render.renderNoData({ user, skipped: view.skipped });
     } catch (err) {
       console.error('Dashboard: page failed to render', err);
-      log('dashboard.render_error', { subject: path, rationale: `${err?.name ?? 'Error'}: ${err?.message ?? String(err)}` });
+      log('dashboard.render_error', { subject: shownPath, rationale: `${err?.name ?? 'Error'}: ${err?.message ?? String(err)}` });
       return send(res, 500, errorPage(user, 500, 'Could not show this page', 'The page could not be built. The problem has been recorded.'));
     }
 
     // ---- Record the data view, THEN show it ----
     log('dashboard.viewed', {
-      subject: path,
+      subject: shownPath,
       detail: view.kind === 'analysis'
         ? { page: 'analysis', analysisId: view.report.analysisId, role: user.role }
         : {

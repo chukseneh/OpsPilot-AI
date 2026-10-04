@@ -155,6 +155,31 @@ test('addresses starting with "//" are not misread as another host', async () =>
   assert.deepEqual(notFound.map((e) => e.subject), ['//double', '//x/analyses/AN-1']);
 });
 
+test('a latest report missing fields the page needs is skipped, and the dashboard still loads', async () => {
+  // Found in code review: a report without, e.g., scope.period passed the old check
+  // and made every dashboard load fail with 500.
+  const store = await storeWith(['AN-1']);
+  const broken = structuredClone(store.get('AN-1'));
+  delete broken.result.report.scope.period;
+  broken.result.report.generatedAt = '2099-01-01T00:00:00.000Z'; // would be "latest"
+  store.put('AN-broken', broken);
+  const { url } = await start({ store });
+  const res = await get(url, '/', await signIn(url, 'da-1', 'data analyst'));
+  assert.equal(res.status, 200);
+  const page = visible(await res.text());
+  assert.match(page, /1 saved analysis could not be read and is not shown/);
+  assert.match(page, /Automation opportunities \(3\)/);
+});
+
+test('a very long junk address is cut short in the audit log', async () => {
+  const { url, audit } = await start();
+  await get(url, `/${'j'.repeat(8000)}`);
+  const [entry] = audit.readAll();
+  assert.ok(entry.subject.length < 260, `subject is ${entry.subject.length} characters`);
+  assert.match(entry.subject, /… \(8001 characters\)$/);
+  assert.ok(entry.rationale.length < 300);
+});
+
 test('a forged or garbled cookie counts as not signed in', async () => {
   const { url } = await start({ store: await storeWith(['AN-1']) });
   assert.equal((await get(url, '/', 'opspilot_demo_user=not-base64-json')).status, 401);
@@ -180,9 +205,12 @@ test('when the data cannot be read, the user gets a 503 "could not load" page an
   const cookie = await signIn(url, 'da-1', 'data analyst');
   const res = await get(url, '/', cookie);
   assert.equal(res.status, 503);
-  assert.match(visible(await res.text()), /The analysis data could not be loaded just now \(Could not read the saved analyses: disk unplugged\)/);
+  const page = visible(await res.text());
+  assert.match(page, /The analysis data could not be loaded just now\. The problem has been recorded/);
+  assert.doesNotMatch(page, /disk unplugged/, 'internal error details stay out of the page');
   const entry = audit.readAll().find((e) => e.action === 'dashboard.data_error');
   assert.equal(entry.actor.id, 'da-1');
+  assert.match(entry.rationale, /disk unplugged/, 'the details are in the audit log');
   assert.ok(!audit.readAll().some((e) => e.action === 'dashboard.viewed'));
 });
 

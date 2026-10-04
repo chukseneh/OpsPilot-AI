@@ -19,8 +19,19 @@ export class DashboardDataError extends Error {
   constructor(message, options) { super(message, options); this.name = 'DashboardDataError'; }
 }
 
-const isReport = (r) => r && typeof r === 'object' && typeof r.analysisId === 'string'
-  && r.summary && Array.isArray(r.findings) && r.scope;
+// A record counts as a usable report only if it has EVERY field the pages read.
+// Anything less is "damaged": skipped and counted, never passed on to break a page.
+const str = (v) => typeof v === 'string';
+const num = (v) => typeof v === 'number' && Number.isFinite(v);
+const isFinding = (f) => f && typeof f === 'object' && str(f.id) && str(f.type) && str(f.title) && str(f.explanation)
+  && (f.exampleCases === undefined || (Array.isArray(f.exampleCases) && f.exampleCases.every((c) => c && str(c.caseId))));
+export const isReport = (r) => Boolean(r) && typeof r === 'object'
+  && str(r.analysisId) && str(r.process) && str(r.generatedAt) && str(r.requestedBy?.id)
+  && num(r.scope?.cases) && num(r.scope?.events) && str(r.scope?.period?.from) && str(r.scope?.period?.to)
+  && str(r.summary?.headline) && num(r.summary?.bottlenecks) && num(r.summary?.duplicates) && num(r.summary?.automationCandidates)
+  && Array.isArray(r.findings) && r.findings.every(isFinding)
+  && Array.isArray(r.method?.rules) && r.method.rules.every(str)
+  && Array.isArray(r.limitations) && r.limitations.every(str);
 
 export function createDashboardData({ store, timeoutMs = DEFAULT_TIMEOUT_MS }) {
   if (!store || typeof store.list !== 'function' || typeof store.get !== 'function') {
@@ -43,18 +54,25 @@ export function createDashboardData({ store, timeoutMs = DEFAULT_TIMEOUT_MS }) {
     }
   }
 
-  // Completed analyses, newest first: { analyses: [summary], skipped: number }.
+  // Completed analyses, newest first:
+  //   { analyses: [summary], skipped: number, latestReport: full report of analyses[0] or null }
+  // One read of the store: the latest report comes from the same read as the list,
+  // so the two can never disagree and nothing is parsed twice.
+  // analysisId in each summary is the id the record is STORED under — the id that
+  // links and getAnalysis() use — whatever the report itself says.
   async function listAnalyses() {
     const entries = await read('the saved analyses', () => store.list());
     if (!Array.isArray(entries)) throw new DashboardDataError('The saved analyses are not in the expected format');
     const analyses = [];
+    const reports = new Map();
     let skipped = 0;
     for (const { id, record } of entries) {
       if (record?.status !== 'completed') continue; // missing data / interrupted: no report exists
       const report = record.result?.report;
       if (!isReport(report)) { skipped += 1; continue; }
+      reports.set(id, report);
       analyses.push({
-        analysisId: report.analysisId ?? id,
+        analysisId: id,
         process: report.process,
         generatedAt: report.generatedAt,
         requestedBy: report.requestedBy?.id ?? 'unknown',
@@ -70,7 +88,7 @@ export function createDashboardData({ store, timeoutMs = DEFAULT_TIMEOUT_MS }) {
     }
     analyses.sort((a, b) => (a.generatedAt < b.generatedAt ? 1 : a.generatedAt > b.generatedAt ? -1 : 0)
       || (a.analysisId < b.analysisId ? -1 : 1));
-    return { analyses, skipped };
+    return { analyses, skipped, latestReport: analyses.length ? reports.get(analyses[0].analysisId) : null };
   }
 
   // One completed analysis's full report, or null if there is none by that id.

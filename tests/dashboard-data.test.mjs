@@ -38,7 +38,7 @@ test('lists completed analyses, newest first, with their headline and counts', a
 });
 
 test('an empty store lists nothing (the "no data" case)', async () => {
-  assert.deepEqual(await createDashboardData({ store: createMemoryResultStore() }).listAnalyses(), { analyses: [], skipped: 0 });
+  assert.deepEqual(await createDashboardData({ store: createMemoryResultStore() }).listAnalyses(), { analyses: [], skipped: 0, latestReport: null });
 });
 
 test('analyses that never produced a report are not listed', async () => {
@@ -90,6 +90,44 @@ test('a store that throws, or returns the wrong shape, is a DashboardDataError',
 test('a store slower than the time limit is a DashboardDataError, not a hang', async () => {
   const slow = { list: () => new Promise(() => {}), get: () => new Promise(() => {}) };
   await assert.rejects(createDashboardData({ store: slow, timeoutMs: 20 }).listAnalyses(), /took longer than 20 ms/);
+});
+
+test('listAnalyses reads the store once and returns the latest full report with the list', async () => {
+  const store = await storeWithAnalyses(['AN-1', 'AN-2']);
+  let lists = 0;
+  let gets = 0;
+  const counting = { list: () => { lists += 1; return store.list(); }, get: (id) => { gets += 1; return store.get(id); } };
+  const { analyses, latestReport } = await createDashboardData({ store: counting }).listAnalyses();
+  assert.equal(latestReport.analysisId, analyses[0].analysisId);
+  assert.deepEqual([lists, gets], [1, 0]);
+  assert.equal((await createDashboardData({ store: createMemoryResultStore() }).listAnalyses()).latestReport, null);
+});
+
+test('links use the id a record is stored under, even if the report says otherwise', async () => {
+  const store = await storeWithAnalyses(['AN-1']);
+  const record = store.get('AN-1');
+  record.result.report.analysisId = 'something-else';
+  store.put('op-1', record);
+  const data = createDashboardData({ store });
+  const ids = (await data.listAnalyses()).analyses.map((a) => a.analysisId);
+  assert.ok(ids.includes('op-1'));
+  assert.ok(await data.getAnalysis('op-1'), 'the listed id can be opened');
+});
+
+test('a record missing any field the pages read is treated as damaged', async () => {
+  const store = await storeWithAnalyses(['AN-1']);
+  const breakers = [
+    (r) => { delete r.scope.period; }, (r) => { delete r.method; }, (r) => { r.limitations = 'none'; },
+    (r) => { delete r.generatedAt; }, (r) => { r.findings[0].title = 42; }, (r) => { r.summary.bottlenecks = 'three'; },
+  ];
+  breakers.forEach((breakIt, i) => {
+    const record = structuredClone(store.get('AN-1'));
+    breakIt(record.result.report);
+    store.put(`bad-${i}`, record);
+  });
+  const { analyses, skipped } = await createDashboardData({ store }).listAnalyses();
+  assert.deepEqual(analyses.map((a) => a.analysisId), ['AN-1']);
+  assert.equal(skipped, breakers.length);
 });
 
 test('refuses to start without a usable store', () => {
