@@ -98,9 +98,10 @@ test('deleting a story from the plan removes it from every tab', () => {
   data.plan.stories = data.plan.stories.filter((s) => s.id !== gone);
   for (const r of data.plan.releases) r.story_ids = r.story_ids.filter((id) => id !== gone);
   for (const r of data.plan.requirements) r.fulfilled_by = r.fulfilled_by.filter((id) => id !== gone);
-  // progress.json still lists it (platform-owned); only the criteria/points pages,
-  // which list progress.json itself, may mention it.
-  const progressListings = new Set(['#/overview/criteria', '#/overview/points']);
+  // progress.json still lists it (platform-owned); only the pages that list
+  // progress.json itself may mention it: criteria, points, and "What is live"
+  // (verified stories, which STORY-011 is once the platform has verified it).
+  const progressListings = new Set(['#/overview/criteria', '#/overview/points', '#/overview/live']);
   for (const [hash, html] of crawl(data)) {
     if (progressListings.has(hash)) continue;
     assert.ok(!html.includes(gone), `${hash} still shows ${gone}`);
