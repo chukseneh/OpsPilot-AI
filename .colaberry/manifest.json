@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-10-05T02:49:04.663Z",
-  "plan_version": 2,
-  "plan_sha256": "9b787610adfb0aa35db90ef516ea68e7ebc3f0ab520a4b057eafcfcc0e35158f",
-  "correlation_id": "4171c6db-af0d-4f54-aa7b-d25cce0cab84",
+  "generated_at": "2026-10-05T11:17:57.072Z",
+  "plan_version": 3,
+  "plan_sha256": "0e39975c3be4e3c6c58e5b0ad3d1883e79c0ca470bc9fdff48ee49d5ae5866f6",
+  "correlation_id": "d71c4a08-5b93-4e26-8f10-3a6b2e9c7d45",
   "project_id": "3704f65e-d372-4085-b821-5b5495f688d0",
   "truth_revision": 1,
   "files": [
@@ -28,7 +28,7 @@
     },
     {
       "path": "docs/stories/STORY-001.md",
-      "sha256": "74c74c7eb9d6cc071e680a81c8ad65606f40f9418281435c4e4996a2f45e877d"
+      "sha256": "882b1dd0dbd9f4fc968c7ee5a7ba2ea3cd00de0be1500d10cb732c31ddb32a3c"
     },
     {
       "path": "docs/stories/STORY-002.md",
@@ -44,7 +44,7 @@
     },
     {
       "path": "docs/stories/STORY-005.md",
-      "sha256": "86169708e2056f8370aa9def2c0738af677090c9069182c1b80c9c30a2f0e73e"
+      "sha256": "fa349642eaafc3d7b3d0b689438d2e505b86f738908c227c1735d717b5cead1d"
     },
     {
       "path": "docs/stories/STORY-006.md",
@@ -52,7 +52,7 @@
     },
     {
       "path": "docs/stories/STORY-007.md",
-      "sha256": "2ab2322ee30705b9ee2e7d5c890f60abb87fbcccc214c73769db432d07d82449"
+      "sha256": "b22c77caa5a5d0b28de2cec160316de252f43a8a37a2556e29e80f8b487d4e73"
     },
     {
       "path": "docs/stories/STORY-008.md",
@@ -64,7 +64,7 @@
     },
     {
       "path": "docs/stories/STORY-010.md",
-      "sha256": "41d8ba62217853fdb3560073edc62f038eb8e7b7f04cb857be04dd641758df59"
+      "sha256": "aaf6e5f09a2e5e7a46745a86c5d6a6abc755fac4f33cd686656a6da830b46441"
     },
     {
       "path": "docs/stories/STORY-011.md",
@@ -76,7 +76,7 @@
     },
     {
       "path": ".colaberry/plan.json",
-      "sha256": "36ba3096b458dd74fd8202e55d3fc92c7511508f60b61210e074f34a723ab138"
+      "sha256": "1e10ee2100c8eaf5e829cebb30095e05573ed3675b2522afbe10b8ae4d84d54b"
     },
     {
       "path": ".colaberry/progress.json",

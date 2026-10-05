@@ -341,7 +341,7 @@
         "Network failure",
         "API rate limits"
       ],
-      "task_guidance": "Implement orchestration logic using Microsoft 365 and Google Workspace APIs to coordinate agent activities.",
+      "task_guidance": "Orchestrate the agents you build in this project. Nothing external is needed and you have no account to connect: when a process operation starts, your orchestrator decides which of your own agents runs and in what order. Handle the failure case explicitly, because it is the second criterion: when an agent fails, reallocate its work to another rather than failing the whole run. Log every orchestration decision, which is what the Trust line asks for.",
       "due_on": "2026-10-01",
       "due_baseline_on": "2026-10-01"
     },
@@ -444,7 +444,7 @@
         "Incorrect risk categorization",
         "Automation failure"
       ],
-      "task_guidance": "Use Claude's workflow-design skill to implement automation with approval gates.",
+      "task_guidance": "Build the approval gate in your own code. There is no pre-built skill for this and you do not need one. Classify each action as high or low risk using the risk work from STORY-003, then let a low-risk action execute and hold a high-risk one until a human approves it. Put the thing that actually performs an action behind one small interface, so a real connector can replace a stand-in later without touching the approval logic. Log every action with its risk level and who approved it.",
       "due_on": "2026-10-01",
       "due_baseline_on": "2026-10-01"
     },
@@ -496,7 +496,7 @@
         "Extraction errors",
         "Document upload failure"
       ],
-      "task_guidance": "Use Claude's document-analysis skill to extract information from documents.",
+      "task_guidance": "Extract the structured fields in your own code. There is no pre-built skill for this. Decide which fields a document must yield, pull them with parsing you write, and when a document is malformed or a required field is missing, flag it for review rather than guessing a value. Log every processing run with the document and the outcome.",
       "due_on": "2026-10-01",
       "due_baseline_on": "2026-10-01"
     },
@@ -574,7 +574,7 @@
         "Simulation timeout",
         "Unexpected workflow behavior"
       ],
-      "task_guidance": "Use Claude's workflow-design skill to simulate workflows with synthetic data.",
+      "task_guidance": "Run the workflows you built in STORY-005 against synthetic data you generate yourself. Nothing external is required. A good simulation proves two things: a correct run behaves as expected, and a deliberately broken input is flagged rather than silently processed. Keep the synthetic data clearly marked as synthetic so a reviewer can never mistake it for real records, and log each simulation run.",
       "due_on": "2026-10-01",
       "due_baseline_on": "2026-10-01"
     },
@@ -608,8 +608,8 @@
     "name": "OpsPilot AI — Enterprise AI Operations, Workflow & Risk Automation Platform",
     "descriptor": "An AI agent that analyses organisational operations, identifies inefficiencies and risks, automates workflows, and measures financial and operational impact.",
     "repo_url": "https://github.com/chukseneh/OpsPilot-AI",
-    "plan_version": 2,
-    "plan_sha256": "9b787610adfb0aa35db90ef516ea68e7ebc3f0ab520a4b057eafcfcc0e35158f"
+    "plan_version": 3,
+    "plan_sha256": "0e39975c3be4e3c6c58e5b0ad3d1883e79c0ca470bc9fdff48ee49d5ae5866f6"
   },
   "schedule": {
     "build_start": "2026-10-01",

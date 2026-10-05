@@ -12,7 +12,7 @@ As a system tester, I want OpsPilot to simulate workflows using synthetic data, 
 
 ## How to build it
 
-Use Claude's workflow-design skill to simulate workflows with synthetic data.
+Run the workflows you built in STORY-005 against synthetic data you generate yourself. Nothing external is required. A good simulation proves two things: a correct run behaves as expected, and a deliberately broken input is flagged rather than silently processed. Keep the synthetic data clearly marked as synthetic so a reviewer can never mistake it for real records, and log each simulation run.
 
 ## Failure paths you must handle
 
