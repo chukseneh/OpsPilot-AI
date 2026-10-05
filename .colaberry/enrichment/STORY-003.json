@@ -35,6 +35,11 @@
       "dimension": "security_context",
       "value": "Every risk assessment step (request, denial, start, each system assessed with its full result and mitigations, unassessed, failed, completed, interrupted, replayed) is written to the hash-chained audit log with the requesting user's id and a timestamp, before the result is saved or returned.",
       "evidence": "tests/risk-service.test.mjs"
+    },
+    {
+      "dimension": "unknowns",
+      "value": "The plan's STORY-003 guidance (plan_version 2) says to assess 'the AI systems already in your inventory from STORY-004', but STORY-004 is blocked by STORY-003, so no inventory exists yet. The assessment takes the registered systems as an input list in the inventory's shape so STORY-004 can supply them later; which order is intended needs confirming.",
+      "evidence": "src/risk/systemData.js"
     }
   ],
   "decisions": [
