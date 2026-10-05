@@ -27,8 +27,8 @@ the same criteria out of `.colaberry/progress.json`, which Claude Code keeps in
 step (see the managed block in CLAUDE.md). Ticking something you have not
 actually met only misleads you.
 
-- [ ] Given AI systems are registered, When a risk assessment is performed, Then risks are identified and categorized.
-- [ ] Given AI systems are registered, When a risk assessment is performed, Then it suggests mitigation actions.
-- [ ] Trust: Risk assessment results are logged for audit purposes.
+- [x] Given AI systems are registered, When a risk assessment is performed, Then risks are identified and categorized.
+- [x] Given AI systems are registered, When a risk assessment is performed, Then it suggests mitigation actions.
+- [x] Trust: Risk assessment results are logged for audit purposes.
 
 When every box above is ticked, stop and show the demo.

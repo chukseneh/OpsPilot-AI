@@ -205,21 +205,35 @@
       "criteria": [
         {
           "text": "Given AI systems are registered, When a risk assessment is performed, Then risks are identified and categorized.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given AI systems are registered, When a risk assessment is performed, Then it suggests mitigation actions.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: Risk assessment results are logged for audit purposes.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/risk/systemData.js",
+        "src/risk/riskModel.js",
+        "src/risk/service.js",
+        "src/risk/report.js",
+        "src/demo/sampleAiSystems.js",
+        "src/demo/riskAssessment.js",
+        "docs/stories/STORY-003.md",
+        ".colaberry/enrichment/STORY-003.json"
+      ],
+      "tests_added": [
+        "tests/system-data.test.mjs",
+        "tests/risk-model.test.mjs",
+        "tests/risk-service.test.mjs",
+        "tests/risk-demo.test.mjs"
+      ],
+      "notes": "Risk assessment of registered AI systems with a rule-based, pluggable risk model: each system gets risks in six categories (privacy, fairness, human oversight, transparency, security, accountability) with severity, reason and suggested mitigations, plus an overall rating. Incomplete systems are reported unassessed while the rest are assessed; risk model errors mark a system failed and the run is not saved; a time limit interrupts hung models. Compliance officer, security officer and operations manager only. Every step and every system result is in the hash-chained audit log. Idempotent by assessmentId. Demo: node src/demo/riskAssessment.js (synthetic systems). Systems are supplied as JSON until the STORY-004 inventory exists.",
+      "updated_at": "2026-10-05T00:00:00.000Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,
