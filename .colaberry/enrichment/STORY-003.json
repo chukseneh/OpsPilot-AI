@@ -1,0 +1,102 @@
+{
+  "schemaVersion": "1",
+  "projectId": "3704f65e-d372-4085-b821-5b5495f688d0",
+  "storyId": "STORY-003",
+  "projectTruthBaseRevision": 1,
+  "observedAt": "2026-10-05T00:00:00.000Z",
+  "sourceCommitSha": "1c1d6be9d47187e74c1a59930bad3cc4a8c7009c",
+  "factProposals": [
+    {
+      "dimension": "inputs",
+      "value": "Risk assessment takes a list of registered AI systems: the inventory fields (id, name, department, purpose, owner, status) plus four risk fields — dataCategories, decisionImpact, humanOversight and userFacing. Until the STORY-004 inventory exists it is supplied as JSON.",
+      "evidence": "src/risk/systemData.js"
+    },
+    {
+      "dimension": "outputs",
+      "value": "A risk assessment report per run: each assessed system with an overall rating (high, medium or low) and its risks, each with a category, severity, the rule that raised it, a plain-language reason and suggested mitigations; plus unassessed and failed systems and the report's limits.",
+      "evidence": "src/risk/service.js"
+    },
+    {
+      "dimension": "data",
+      "value": "Risks fall into six categories: privacy, fairness, human_oversight, transparency, security and accountability, with severities low, medium and high.",
+      "evidence": "src/risk/riskModel.js"
+    },
+    {
+      "dimension": "approval_points",
+      "value": "Only the compliance officer, security officer and operations manager roles may run or read a risk assessment; anyone else is refused and the refusal is logged.",
+      "evidence": "tests/risk-service.test.mjs"
+    },
+    {
+      "dimension": "exceptions",
+      "value": "A system with incomplete or invalid data is reported unassessed with each missing field named while the others are assessed; a risk model error marks that system failed and the run is not saved; a run past its time limit (default 30 s) or cancelled is interrupted, saves nothing and can be re-run.",
+      "evidence": "tests/risk-service.test.mjs"
+    },
+    {
+      "dimension": "security_context",
+      "value": "Every risk assessment step (request, denial, start, each system assessed with its full result and mitigations, unassessed, failed, completed, interrupted, replayed) is written to the hash-chained audit log with the requesting user's id and a timestamp, before the result is saved or returned.",
+      "evidence": "tests/risk-service.test.mjs"
+    }
+  ],
+  "decisions": [
+    {
+      "statement": "Use a rule-based risk model behind a pluggable interface rather than calling Claude now.",
+      "rationale": "No Claude risk-assessment skill or API key exists in the project; rules are explainable and testable offline, and a Claude-backed model can implement the same interface later. Chosen by the student before building.",
+      "evidence": "src/risk/riskModel.js"
+    },
+    {
+      "statement": "Assess systems with complete data and report incomplete ones as unassessed, rather than refusing the whole run.",
+      "rationale": "One badly registered system should not block the assessment of the rest. Chosen by the student before building.",
+      "evidence": "src/risk/systemData.js"
+    },
+    {
+      "statement": "Allow the compliance officer, security officer and operations manager roles to run risk assessments.",
+      "rationale": "Chosen by the student before building.",
+      "evidence": "src/risk/service.js"
+    },
+    {
+      "statement": "Check every risk model's output (known category and severity, a reason, at least one mitigation) and treat anything malformed as a model error, never as a finding.",
+      "rationale": "A future model must not be able to report a risk without a category or a mitigation.",
+      "evidence": "src/risk/riskModel.js"
+    },
+    {
+      "statement": "Do not save an assessment where the model failed on any system, so a re-run with the same id retries it.",
+      "rationale": "Saving it would replay the failure for ever under that id.",
+      "evidence": "src/risk/service.js"
+    }
+  ],
+  "limitations": [
+    {
+      "statement": "The assessment is a rule-based first screen from registered details only; it does not inspect the systems, and a system rated low only means no rule fired.",
+      "evidence": "src/risk/service.js"
+    },
+    {
+      "statement": "No jurisdiction-specific law is applied; that is left to configurable governance controls (STORY-009).",
+      "evidence": "src/risk/service.js"
+    },
+    {
+      "statement": "Registered systems are passed in as JSON; there is no inventory store yet (STORY-004), and the system owner is a text field where the data model has owner_id.",
+      "evidence": "src/risk/systemData.js"
+    },
+    {
+      "statement": "The risk service is not yet wired into the STORY-001 orchestrator as a Risk Agent; the demo calls the service directly.",
+      "evidence": "src/demo/riskAssessment.js"
+    },
+    {
+      "statement": "Identity is whatever the caller says it is; there is no login yet.",
+      "evidence": "src/risk/service.js"
+    },
+    {
+      "statement": "A timed-out model call is no longer waited for but is not forcibly stopped if it ignores the cancel signal.",
+      "evidence": "src/risk/service.js"
+    }
+  ],
+  "demonstrationEvidence": [
+    { "kind": "test", "ref": "tests/system-data.test.mjs" },
+    { "kind": "test", "ref": "tests/risk-model.test.mjs" },
+    { "kind": "test", "ref": "tests/risk-service.test.mjs" },
+    { "kind": "test", "ref": "tests/risk-demo.test.mjs" },
+    { "kind": "demo", "ref": "src/demo/riskAssessment.js" },
+    { "kind": "commit", "ref": "1c1d6be9d47187e74c1a59930bad3cc4a8c7009c" }
+  ],
+  "measurementEvents": []
+}
