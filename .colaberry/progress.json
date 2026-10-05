@@ -3,13 +3,13 @@
   "project": "OpsPilot AI — Enterprise AI Operations, Workflow & Risk Automation Platform",
   "totals": {
     "stories_total": 12,
-    "stories_verified": 4,
+    "stories_verified": 5,
     "stories_submitted": 0,
-    "stories_in_progress": 8,
+    "stories_in_progress": 7,
     "stories_not_started": 0,
     "criteria_total": 38,
-    "criteria_passed": 14,
-    "points_awarded": 1041
+    "criteria_passed": 17,
+    "points_awarded": 1108
   },
   "stories": [
     {
@@ -221,19 +221,15 @@
       "notes": "Risk assessment of registered AI systems with a rule-based, pluggable risk model: each system gets risks in six categories (privacy, fairness, human oversight, transparency, security, accountability) with severity, reason and suggested mitigations, plus an overall rating. Incomplete systems are reported unassessed while the rest are assessed; risk model errors mark a system failed and the run is not saved; a time limit interrupts hung models. Compliance officer, security officer and operations manager only. Every step and every system result is in the hash-chained audit log. Idempotent by assessmentId. Demo: node src/demo/riskAssessment.js (synthetic systems). Systems are supplied as JSON until the STORY-004 inventory exists.",
       "updated_at": "2026-10-05T00:00:00.000Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": null,
-        "outstanding": [
-          "Given AI systems are registered, When a risk assessment is performed, Then risks are identified and categorized.",
-          "Given AI systems are registered, When a risk assessment is performed, Then it suggests mitigation actions.",
-          "Trust: Risk assessment results are logged for audit purposes."
-        ]
+        "verified_at": "2026-10-05T00:12:12.799Z",
+        "commit_sha": "1c1d6be9d47187e74c1a59930bad3cc4a8c7009c",
+        "commit_url": "https://github.com/chukseneh/OpsPilot-AI/commit/1c1d6be9d47187e74c1a59930bad3cc4a8c7009c",
+        "commit_at": "2026-10-05T00:09:03Z",
+        "points_awarded": 67,
+        "outstanding": []
       }
     },
     {
