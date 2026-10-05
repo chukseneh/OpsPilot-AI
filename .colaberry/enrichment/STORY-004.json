@@ -1,0 +1,126 @@
+{
+  "schemaVersion": "1",
+  "projectId": "3704f65e-d372-4085-b821-5b5495f688d0",
+  "storyId": "STORY-004",
+  "projectTruthBaseRevision": 1,
+  "observedAt": "2026-10-05T00:00:00.000Z",
+  "sourceCommitSha": "4aff2512c2adaad93c27b6c6ce7882df6c145255",
+  "factProposals": [
+    {
+      "dimension": "systems",
+      "value": "The AI system inventory is stored in PostgreSQL, in one ai_systems table whose rules (allowed statuses, risk levels, data categories, non-blank fields, a risk level must name the assessment that set it) are enforced by the database itself.",
+      "evidence": "src/inventory/db.js"
+    },
+    {
+      "dimension": "data",
+      "value": "Each inventory entry holds id, name, department, purpose, owner, status (proposed, active, paused, retired), risk level (low, medium, high, unassessed) with the assessment id and time that set it, the four risk-relevant fields used by risk assessment, a version number and created/updated times.",
+      "evidence": "src/inventory/db.js"
+    },
+    {
+      "dimension": "outputs",
+      "value": "Viewing the inventory returns every registered system with all its details ordered by name, plus any stored rows that break the rules listed as inconsistencies rather than hidden.",
+      "evidence": "tests/inventory-service.test.mjs"
+    },
+    {
+      "dimension": "approval_points",
+      "value": "Only the IT manager may register AI systems or change their status; the IT manager, compliance officer, security officer and operations manager may view the inventory; anyone else, or a request with no user, is refused and the refusal logged.",
+      "evidence": "src/inventory/service.js"
+    },
+    {
+      "dimension": "approval_points",
+      "value": "A completed risk assessment's ratings may be recorded into the inventory by the IT manager or by the roles that may run risk assessments (compliance officer, security officer, operations manager).",
+      "evidence": "tests/inventory-risk.test.mjs"
+    },
+    {
+      "dimension": "exceptions",
+      "value": "A status change made from an out-of-date read is refused (version check) and the newer value kept; an id reused with different details is refused; incomplete system data is refused with each problem named; an unreachable database gives a DatabaseUnavailableError within the connect timeout after capped retries, and is logged.",
+      "evidence": "tests/inventory-service.test.mjs"
+    },
+    {
+      "dimension": "security_context",
+      "value": "Every inventory view and change (registration, status change, risk recorded, refusals, conflicts, database unavailable) is written to the hash-chained audit log with the user id and time; a change is logged inside its database transaction, so a failed audit write rolls the change back and a failed commit is followed by a correcting entry.",
+      "evidence": "tests/inventory-service.test.mjs"
+    },
+    {
+      "dimension": "security_context",
+      "value": "The real database connection string is read from the DATABASE_URL environment variable and never logged, printed or put into an error message.",
+      "evidence": "tests/inventory-db.test.mjs"
+    },
+    {
+      "dimension": "unknowns",
+      "value": "Resolves the ordering question raised by STORY-003: risk assessment now runs against the inventory (systemsForAssessment) and its ratings are written back into the inventory's risk field, so both orders described in the plan are now supported.",
+      "evidence": "tests/inventory-risk.test.mjs"
+    }
+  ],
+  "decisions": [
+    {
+      "statement": "Run the tests and demo on PGlite (PostgreSQL compiled to run inside Node) and use the pg driver for a real PostgreSQL server, both behind the same small query interface and the same SQL.",
+      "rationale": "No PostgreSQL server, Docker or credentials were available on the build machine. Chosen by the student before building.",
+      "evidence": "src/inventory/db.js"
+    },
+    {
+      "statement": "The IT manager edits the inventory; compliance officer, security officer and operations manager view it.",
+      "rationale": "Chosen by the student before building.",
+      "evidence": "src/inventory/service.js"
+    },
+    {
+      "statement": "Fill the inventory's risk field only from completed STORY-003 risk assessments, never by hand; an older assessment cannot overwrite a newer one, and a system changed after it was assessed keeps its old rating until re-assessed.",
+      "rationale": "Chosen by the student before building; every rating can then be traced to the assessment that produced it.",
+      "evidence": "src/inventory/service.js"
+    },
+    {
+      "statement": "Use a version number on each system and require the caller's last-read version for a status change (optimistic concurrency).",
+      "rationale": "Stops a change made from a stale screen from silently overwriting a newer one.",
+      "evidence": "src/inventory/service.js"
+    },
+    {
+      "statement": "Retry reaching the database only for errors that can clear on their own, at most 3 times with backoff, and never retry a query after the connection is established.",
+      "rationale": "A wrong password cannot be fixed by retrying, and a retried write might apply twice.",
+      "evidence": "src/inventory/db.js"
+    },
+    {
+      "statement": "Declare the repo's JavaScript as ES modules and give the CommonJS secret scanner its own package.json.",
+      "rationale": "Adding package.json for the database libraries made Node warn on every script.",
+      "evidence": "package.json"
+    }
+  ],
+  "limitations": [
+    {
+      "statement": "The table is created if missing, but there are no migrations: an existing table in an older shape is not altered.",
+      "evidence": "src/inventory/db.js"
+    },
+    {
+      "statement": "The code has not been run against a real PostgreSQL server; only PGlite (PostgreSQL 18.3 in Node) and connection-failure paths against a closed or silent local port were exercised.",
+      "evidence": "tests/inventory-db.test.mjs"
+    },
+    {
+      "statement": "Identity is whatever the caller says it is; there is no login yet.",
+      "evidence": "src/inventory/service.js"
+    },
+    {
+      "statement": "The system owner is a text field, not a link to a person record as in the data model (owner_id).",
+      "evidence": "src/inventory/db.js"
+    },
+    {
+      "statement": "Only status can be changed after registration; other details cannot yet be edited, and systems cannot be removed.",
+      "evidence": "src/inventory/service.js"
+    },
+    {
+      "statement": "Whether a system changed after it was assessed compares the database's clock with the assessment's clock; on a separate database server, clock skew could misjudge it.",
+      "evidence": "src/inventory/service.js"
+    },
+    {
+      "statement": "The audit log is a file and the inventory is in the database, so the two are not one atomic write; a failed commit is corrected with a follow-up audit entry rather than prevented.",
+      "evidence": "src/inventory/service.js"
+    }
+  ],
+  "demonstrationEvidence": [
+    { "kind": "test", "ref": "tests/inventory-db.test.mjs" },
+    { "kind": "test", "ref": "tests/inventory-service.test.mjs" },
+    { "kind": "test", "ref": "tests/inventory-risk.test.mjs" },
+    { "kind": "test", "ref": "tests/inventory-demo.test.mjs" },
+    { "kind": "demo", "ref": "src/demo/inventory.js" },
+    { "kind": "commit", "ref": "4aff2512c2adaad93c27b6c6ce7882df6c145255" }
+  ],
+  "measurementEvents": []
+}
