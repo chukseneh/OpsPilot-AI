@@ -392,7 +392,7 @@
         "Risk model errors",
         "Assessment timeout"
       ],
-      "task_guidance": "Use Claude's risk-assessment skill to evaluate AI systems.",
+      "task_guidance": "Build the risk assessment in your own code, against the AI systems already in your inventory from STORY-004. For each registered system, identify its risks and put them into named categories you choose and can defend, then record a suggested mitigation for each one. Write every assessment run to a log with what was assessed, what was found and when, so the Trust line is satisfied by a real record rather than a claim. No external service and no pre-built skill is required for this story.",
       "due_on": "2026-10-01",
       "due_baseline_on": "2026-10-01"
     },
@@ -608,8 +608,8 @@
     "name": "OpsPilot AI — Enterprise AI Operations, Workflow & Risk Automation Platform",
     "descriptor": "An AI agent that analyses organisational operations, identifies inefficiencies and risks, automates workflows, and measures financial and operational impact.",
     "repo_url": "https://github.com/chukseneh/OpsPilot-AI",
-    "plan_version": 1,
-    "plan_sha256": "29a5ce2db2095339807f467ba39ea4f4fcec9f26c2d2299fe20b0e2e59580c73"
+    "plan_version": 2,
+    "plan_sha256": "9b787610adfb0aa35db90ef516ea68e7ebc3f0ab520a4b057eafcfcc0e35158f"
   },
   "schedule": {
     "build_start": "2026-10-01",

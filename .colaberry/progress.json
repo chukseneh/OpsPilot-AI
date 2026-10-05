@@ -3,13 +3,13 @@
   "project": "OpsPilot AI — Enterprise AI Operations, Workflow & Risk Automation Platform",
   "totals": {
     "stories_total": 12,
-    "stories_verified": 0,
+    "stories_verified": 4,
     "stories_submitted": 0,
-    "stories_in_progress": 12,
+    "stories_in_progress": 8,
     "stories_not_started": 0,
     "criteria_total": 38,
-    "criteria_passed": 0,
-    "points_awarded": 773
+    "criteria_passed": 14,
+    "points_awarded": 1041
   },
   "stories": [
     {
@@ -69,21 +69,15 @@
       "notes": "Static Command Center at the repo root; all nine tabs read .colaberry/ at runtime. Run the checks with: node --test \"tests/*.test.mjs\"",
       "updated_at": "2026-10-01T10:06:37.447Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 5,
         "criteria_total": 5,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 133,
-        "outstanding": [
-          "Given the Command Center, when it is opened, then every tab is reachable and every card drills down one level.",
-          "Given sample mode, when any tab is shown, then the sample data is visibly labelled as sample.",
-          "Given the Command Center, when any tab renders, then .colaberry/plan.json and .colaberry/progress.json are both committed in this repo and every tab reads its content from them at runtime rather than from hard-coded values.",
-          "Given the Command Center, when any tab is shown, then .colaberry/manifest.json is committed in this repo and every tab shows how old that data is and warns when the age exceeds a week.",
-          "Trust — no tab shows a number, a connection or a result the project has not actually produced."
-        ]
+        "verified_at": "2026-10-01T10:07:46.651Z",
+        "commit_sha": "e163557fa044752cd2f17f7fe8358e5b3d9fe337",
+        "commit_url": "https://github.com/chukseneh/OpsPilot-AI/commit/e163557fa044752cd2f17f7fe8358e5b3d9fe337",
+        "commit_at": "2026-10-01T10:07:39Z",
+        "points_awarded": 200,
+        "outstanding": []
       }
     },
     {
@@ -125,19 +119,15 @@
       "notes": "Orchestration core with reallocation and a hash-chained audit log; demo: node src/demo/run.js. Agents in the demo are stand-ins. REQ-001 is NOT met yet: no real Microsoft 365 or Google Workspace connector exists (needs credentials); only the connector interface is built.",
       "updated_at": "2026-10-02T03:03:02.173Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 80,
-        "outstanding": [
-          "Given multiple agents are available, when I initiate a process operation, then the system orchestrates the agents to complete the operation.",
-          "Given an agent fails during orchestration, when the system detects the failure, then it reallocates tasks to other agents.",
-          "Trust: The system logs all orchestration activities for audit purposes."
-        ]
+        "verified_at": "2026-10-02T02:51:26.931Z",
+        "commit_sha": "1ac7413972543b855b81aee586ba6e5d3796c3d5",
+        "commit_url": "https://github.com/chukseneh/OpsPilot-AI/commit/1ac7413972543b855b81aee586ba6e5d3796c3d5",
+        "commit_at": "2026-10-02T02:51:19Z",
+        "points_awarded": 147,
+        "outstanding": []
       }
     },
     {
@@ -183,19 +173,15 @@
       "notes": "Process analysis from an event log: bottlenecks, duplicated work, automation candidates, as a detailed report; incomplete data returns a missing-data notice instead; analysts and operations managers only; every step audited with user id and timestamp. Demo: node src/demo/analyse.js (synthetic data). Input is a JSON event log until a real connector exists (REQ-001).",
       "updated_at": "2026-10-03T00:24:28.105Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 80,
-        "outstanding": [
-          "Given a set of process data, when the analysis is initiated, then the system should provide a detailed report of inefficiencies.",
-          "Given an incomplete data set, when the analysis is attempted, then the system should notify the user of missing data.",
-          "Trust: The system logs all analysis activities with timestamps and user IDs for audit purposes."
-        ]
+        "verified_at": "2026-10-02T23:48:07.055Z",
+        "commit_sha": "70d288d6bf652781b8a70596ae3be5cc610d3583",
+        "commit_url": "https://github.com/chukseneh/OpsPilot-AI/commit/70d288d6bf652781b8a70596ae3be5cc610d3583",
+        "commit_at": "2026-10-02T23:47:58Z",
+        "points_awarded": 147,
+        "outstanding": []
       }
     },
     {
@@ -555,19 +541,15 @@
       "notes": "Process analysis dashboard: a local web server (127.0.0.1) showing saved STORY-002 reports — latest results and automation opportunities, every analysis, full reports; a no-data message; 401/403 for unauthorised access, 503 when data cannot be read, 500 on a rendering error; every request audited with user id and timestamp before anything is shown. Demo: node src/demo/dashboard.js (synthetic data; demo sign-in, not real authentication).",
       "updated_at": "2026-10-04T01:37:16.956Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 80,
-        "outstanding": [
-          "Given process analysis data is available, when I access the dashboard, then I see the analysis results and automation opportunities.",
-          "Given no data is available, when I access the dashboard, then I see a message indicating no data is present.",
-          "Trust: The system logs all dashboard accesses and data views for audit purposes."
-        ]
+        "verified_at": "2026-10-04T01:00:13.708Z",
+        "commit_sha": "2891d71d5fa75a1f221dac39b599329d287371a2",
+        "commit_url": "https://github.com/chukseneh/OpsPilot-AI/commit/2891d71d5fa75a1f221dac39b599329d287371a2",
+        "commit_at": "2026-10-04T01:00:02Z",
+        "points_awarded": 147,
+        "outstanding": []
       }
     }
   ]
