@@ -1,0 +1,16 @@
+{
+  "name": "opspilot-ai",
+  "private": true,
+  "type": "module",
+  "description": "OpsPilot AI — Enterprise AI Operations, Workflow & Risk Automation Platform",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"tests/*.test.mjs\""
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "pg": "^8.23.1"
+  }
+}

@@ -27,8 +27,8 @@ the same criteria out of `.colaberry/progress.json`, which Claude Code keeps in
 step (see the managed block in CLAUDE.md). Ticking something you have not
 actually met only misleads you.
 
-- [ ] Given AI systems are registered, When I view the inventory, Then it lists all systems with details.
-- [ ] Given AI systems are registered, When I update a system's status, Then the inventory reflects the change.
-- [ ] Trust: Inventory changes are logged for audit purposes.
+- [x] Given AI systems are registered, When I view the inventory, Then it lists all systems with details.
+- [x] Given AI systems are registered, When I update a system's status, Then the inventory reflects the change.
+- [x] Trust: Inventory changes are logged for audit purposes.
 
 When every box above is ticked, stop and show the demo.
