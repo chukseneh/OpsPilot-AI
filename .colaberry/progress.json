@@ -3,13 +3,13 @@
   "project": "OpsPilot AI — Enterprise AI Operations, Workflow & Risk Automation Platform",
   "totals": {
     "stories_total": 12,
-    "stories_verified": 5,
+    "stories_verified": 6,
     "stories_submitted": 0,
-    "stories_in_progress": 7,
+    "stories_in_progress": 6,
     "stories_not_started": 0,
     "criteria_total": 38,
-    "criteria_passed": 17,
-    "points_awarded": 1108
+    "criteria_passed": 20,
+    "points_awarded": 1175
   },
   "stories": [
     {
@@ -269,19 +269,15 @@
       "notes": "AI system inventory in PostgreSQL (system, department, purpose, risk, owner, status, version): view lists every system with details; status changes are reflected immediately with a new version; risk is filled from completed STORY-003 assessments. IT manager registers and updates; compliance officer, security officer and operations manager view. Every view and change is in the hash-chained audit log, written inside the database transaction. Out-of-date updates and reused ids are refused; repeats change nothing. Tests and demo run on PGlite (PostgreSQL in Node); a real server is used via DATABASE_URL with connect/query timeouts and capped retries. Demo: node src/demo/inventory.js (synthetic systems).",
       "updated_at": "2026-10-05T00:00:00.000Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": null,
-        "outstanding": [
-          "Given AI systems are registered, When I view the inventory, Then it lists all systems with details.",
-          "Given AI systems are registered, When I update a system's status, Then the inventory reflects the change.",
-          "Trust: Inventory changes are logged for audit purposes."
-        ]
+        "verified_at": "2026-10-05T02:39:42.049Z",
+        "commit_sha": "4aff2512c2adaad93c27b6c6ce7882df6c145255",
+        "commit_url": "https://github.com/chukseneh/OpsPilot-AI/commit/4aff2512c2adaad93c27b6c6ce7882df6c145255",
+        "commit_at": "2026-10-05T02:38:16Z",
+        "points_awarded": 67,
+        "outstanding": []
       }
     },
     {
