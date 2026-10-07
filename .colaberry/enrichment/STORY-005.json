@@ -47,9 +47,9 @@
       "evidence": "src/automation/executors.js"
     },
     {
-      "dimension": "unknowns",
-      "value": "The plan's guidance for STORY-005 says to use \"Claude's workflow-design skill\"; no such skill exists in this project, so approval gates were built in the project's own code (as the platform's revised STORY-003 guidance did for risk assessment).",
-      "evidence": "src/automation/workflows.js"
+      "dimension": "constraints",
+      "value": "The approval gate is the project's own code, as the revised STORY-005 guidance (plan_version 3) asks: actions are classified using the STORY-003 risk ratings held in the STORY-004 inventory, and whatever performs an action sits behind one executor interface ({ type, run(params, { idempotencyKey, signal }) }) so a real connector can replace a stand-in without touching the approval logic.",
+      "evidence": "src/automation/executors.js"
     }
   ],
   "decisions": [
