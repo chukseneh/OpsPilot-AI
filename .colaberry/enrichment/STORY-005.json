@@ -1,0 +1,133 @@
+{
+  "schemaVersion": "1",
+  "projectId": "3704f65e-d372-4085-b821-5b5495f688d0",
+  "storyId": "STORY-005",
+  "projectTruthBaseRevision": 1,
+  "observedAt": "2026-10-08T00:00:00.000Z",
+  "sourceCommitSha": "e7d269d43bfe68f7e0dbb132f7a1c2c1fae8318c",
+  "factProposals": [
+    {
+      "dimension": "inputs",
+      "value": "A workflow is an ordered list of actions, each with a type (notify, create_ticket, inventory.update_status, payment), its parameters, and optionally a declared risk and an irreversible flag.",
+      "evidence": "src/automation/workflows.js"
+    },
+    {
+      "dimension": "data",
+      "value": "Workflow runs and their actions are stored in PostgreSQL (workflow_runs, workflow_actions) with each action's risk level and reasons, status, attempts, result or error, approval request time, deadline, escalation time and decision; the database refuses an action that waits, is approved or runs without a risk level.",
+      "evidence": "src/automation/workflows.js"
+    },
+    {
+      "dimension": "approval_points",
+      "value": "A high-risk workflow action waits for a process manager's approval; once escalated (after 4 hours) an operations manager or compliance officer may also decide; the person who started the workflow may never approve its high-risk actions.",
+      "evidence": "tests/workflow-approvals.test.mjs"
+    },
+    {
+      "dimension": "approval_points",
+      "value": "Only process managers and operations managers may start or resume workflows.",
+      "evidence": "tests/workflows.test.mjs"
+    },
+    {
+      "dimension": "human_only_decisions",
+      "value": "Payments, any action touching an AI system the inventory rates high risk or has not assessed, taking an AI system in active use out of service, irreversible actions and unknown action types always need a person's approval; time passing never approves them.",
+      "evidence": "src/automation/actionRisk.js"
+    },
+    {
+      "dimension": "exceptions",
+      "value": "An approval not decided within 24 hours expires as rejected and the rest of the workflow is skipped; a failed action stops the workflow at that step and can be resumed; an approved action whose AI system changed while it waited is refused by the inventory rather than run on stale information.",
+      "evidence": "tests/workflow-delays.test.mjs"
+    },
+    {
+      "dimension": "security_context",
+      "value": "Every workflow action is written to the audit log with its risk level: when classified (with the rules that set the level), when it waits for approval, is approved, rejected, escalated or expired, and when it runs (marked automatic or with who approved it) or fails.",
+      "evidence": "tests/automation-demo.test.mjs"
+    },
+    {
+      "dimension": "actors",
+      "value": "The Automation Agent acts under its own service identity (automation-agent) holding the IT manager role, so it can change an AI system's status in the inventory, but only for a low-risk action or one a person approved.",
+      "evidence": "src/automation/executors.js"
+    },
+    {
+      "dimension": "unknowns",
+      "value": "The plan's guidance for STORY-005 says to use \"Claude's workflow-design skill\"; no such skill exists in this project, so approval gates were built in the project's own code (as the platform's revised STORY-003 guidance did for risk assessment).",
+      "evidence": "src/automation/workflows.js"
+    }
+  ],
+  "decisions": [
+    {
+      "statement": "Classify each action with named rules that can raise the risk but never lower it; an author's \"low\" label never overrides the rules, and anything unknown is high.",
+      "rationale": "Guards against incorrect risk categorisation. Chosen by the student before building.",
+      "evidence": "src/automation/actionRisk.js"
+    },
+    {
+      "statement": "Escalate an approval after 4 hours to more approver roles with a reminder, and expire it as rejected at 24 hours; never approve by timeout.",
+      "rationale": "Handles approval delays without ever letting a high-risk action run unreviewed. Chosen by the student before building.",
+      "evidence": "src/automation/workflows.js"
+    },
+    {
+      "statement": "Process manager approves; operations manager and compliance officer may approve once escalated; the workflow's starter may not approve their own high-risk action.",
+      "rationale": "Approver roles chosen by the student; separation of duties added so a person cannot both start and approve.",
+      "evidence": "src/automation/workflows.js"
+    },
+    {
+      "statement": "Run the Automation Agent under its own identity with the IT manager role for inventory status changes.",
+      "rationale": "Inventory changes are IT-manager-only (STORY-004); confirmed by the student.",
+      "evidence": "src/automation/executors.js"
+    },
+    {
+      "statement": "Make one action real (changing an AI system's status in the inventory) and the rest clearly labelled stand-ins behind a pluggable executor.",
+      "rationale": "No Microsoft 365, ticketing or finance connection exists. Chosen by the student before building.",
+      "evidence": "src/automation/executors.js"
+    },
+    {
+      "statement": "Pin the AI system's version when an action is classified, so a change while it waits makes the inventory refuse it.",
+      "rationale": "An approval is given for the situation the approver saw, not for whatever it became.",
+      "evidence": "tests/workflow-approvals.test.mjs"
+    },
+    {
+      "statement": "Re-classify a failed action when a workflow is resumed, rather than reusing its earlier risk level or approval.",
+      "rationale": "The risk may have changed while it was failed.",
+      "evidence": "src/automation/workflows.js"
+    }
+  ],
+  "limitations": [
+    {
+      "statement": "Notify, create-ticket and payment actions are stand-ins; nothing is sent, created or paid outside the system.",
+      "evidence": "src/automation/executors.js"
+    },
+    {
+      "statement": "Any action that names a high-risk AI system needs approval, even a plain notification about it.",
+      "evidence": "src/automation/actionRisk.js"
+    },
+    {
+      "statement": "Only one process may run a given workflow at a time (an in-process lock); several engine processes sharing one database are not coordinated.",
+      "evidence": "src/automation/workflows.js"
+    },
+    {
+      "statement": "The escalation reminder is sent once after the escalation is saved; if the process stops in between, the reminder is not re-sent.",
+      "evidence": "src/automation/workflows.js"
+    },
+    {
+      "statement": "Approval delays are only acted on when checkApprovalDelays() runs (or someone tries to decide); no scheduler is set up in this build.",
+      "evidence": "src/automation/workflows.js"
+    },
+    {
+      "statement": "A resumed action that had been approved needs approval again, because it is re-classified.",
+      "evidence": "src/automation/workflows.js"
+    },
+    {
+      "statement": "The workflow tables are created if missing, with no migrations, and have only been run on PGlite, not a separate PostgreSQL server.",
+      "evidence": "tests/workflows.test.mjs"
+    }
+  ],
+  "demonstrationEvidence": [
+    { "kind": "test", "ref": "tests/action-risk.test.mjs" },
+    { "kind": "test", "ref": "tests/automation-executors.test.mjs" },
+    { "kind": "test", "ref": "tests/workflows.test.mjs" },
+    { "kind": "test", "ref": "tests/workflow-approvals.test.mjs" },
+    { "kind": "test", "ref": "tests/workflow-delays.test.mjs" },
+    { "kind": "test", "ref": "tests/automation-demo.test.mjs" },
+    { "kind": "demo", "ref": "src/demo/automation.js" },
+    { "kind": "commit", "ref": "e7d269d43bfe68f7e0dbb132f7a1c2c1fae8318c" }
+  ],
+  "measurementEvents": []
+}
