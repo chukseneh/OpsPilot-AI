@@ -287,21 +287,35 @@
       "criteria": [
         {
           "text": "Given a workflow is automated, When a high-risk action is detected, Then it requires human approval.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given a workflow is automated, When a low-risk action is detected, Then it executes automatically.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: All automated actions are logged with risk levels.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/automation/actionRisk.js",
+        "src/automation/executors.js",
+        "src/automation/workflows.js",
+        "src/demo/automation.js",
+        "docs/stories/STORY-005.md",
+        ".colaberry/enrichment/STORY-005.json"
+      ],
+      "tests_added": [
+        "tests/action-risk.test.mjs",
+        "tests/automation-executors.test.mjs",
+        "tests/workflows.test.mjs",
+        "tests/workflow-approvals.test.mjs",
+        "tests/workflow-delays.test.mjs",
+        "tests/automation-demo.test.mjs"
+      ],
+      "notes": "Workflow automation with human oversight: each action is classified by named rules (action type, the AI system's live inventory risk, taking a system out of use, payment limit, irreversibility; an author label can raise but never lower it; unknown means high). Low-risk actions run automatically; high-risk ones wait for a process manager who did not start the workflow; after 4 h the approval escalates to operations managers and compliance officers with a reminder, and at 24 h it expires as rejected. Failed actions stop the workflow and can be resumed; every action runs once by idempotency key with timeouts and capped retries. Runs live in PostgreSQL; every action is audited with its risk level. Notify, ticket and payment are stand-ins; the inventory status change is real. Demo: node src/demo/automation.js (synthetic data).",
+      "updated_at": "2026-10-08T00:00:00.000Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,

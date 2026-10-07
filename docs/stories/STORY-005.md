@@ -27,8 +27,8 @@ the same criteria out of `.colaberry/progress.json`, which Claude Code keeps in
 step (see the managed block in CLAUDE.md). Ticking something you have not
 actually met only misleads you.
 
-- [ ] Given a workflow is automated, When a high-risk action is detected, Then it requires human approval.
-- [ ] Given a workflow is automated, When a low-risk action is detected, Then it executes automatically.
-- [ ] Trust: All automated actions are logged with risk levels.
+- [x] Given a workflow is automated, When a high-risk action is detected, Then it requires human approval.
+- [x] Given a workflow is automated, When a low-risk action is detected, Then it executes automatically.
+- [x] Trust: All automated actions are logged with risk levels.
 
 When every box above is ticked, stop and show the demo.
