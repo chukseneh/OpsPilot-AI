@@ -12,7 +12,7 @@ As a user, I want OpsPilot to extract structured information from uploaded docum
 
 ## How to build it
 
-Use Claude's document-analysis skill to extract information from documents.
+Extract the structured fields in your own code. There is no pre-built skill for this. Decide which fields a document must yield, pull them with parsing you write, and when a document is malformed or a required field is missing, flag it for review rather than guessing a value. Log every processing run with the document and the outcome.
 
 ## Failure paths you must handle
 

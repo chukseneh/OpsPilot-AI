@@ -12,7 +12,7 @@ As a process manager, I want OpsPilot to automate workflows with human oversight
 
 ## How to build it
 
-Use Claude's workflow-design skill to implement automation with approval gates.
+Build the approval gate in your own code. There is no pre-built skill for this and you do not need one. Classify each action as high or low risk using the risk work from STORY-003, then let a low-risk action execute and hold a high-risk one until a human approves it. Put the thing that actually performs an action behind one small interface, so a real connector can replace a stand-in later without touching the approval logic. Log every action with its risk level and who approved it.
 
 ## Failure paths you must handle
 

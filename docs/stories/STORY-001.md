@@ -13,7 +13,7 @@ As an operations manager, I want to orchestrate multiple agents for process, ris
 
 ## How to build it
 
-Implement orchestration logic using Microsoft 365 and Google Workspace APIs to coordinate agent activities.
+Orchestrate the agents you build in this project. Nothing external is needed and you have no account to connect: when a process operation starts, your orchestrator decides which of your own agents runs and in what order. Handle the failure case explicitly, because it is the second criterion: when an agent fails, reallocate its work to another rather than failing the whole run. Log every orchestration decision, which is what the Trust line asks for.
 
 ## Failure paths you must handle
 
