@@ -14,6 +14,7 @@
 //   startWorkflow({ user, workflowId, name, actions }) → the workflow, as far as it got
 //   decide({ user, workflowId, step, decision: 'approve' | 'reject', note }) → the workflow after the decision
 //   checkApprovalDelays()                               → escalate / expire approvals that waited too long
+//   startApprovalTimer({ everyMs })                     → run checkApprovalDelays() on a schedule
 //   resumeWorkflow({ user, workflowId })                → retry a failed workflow from the failed step
 //   getWorkflow(workflowId)                             → { run, actions }
 //
@@ -371,6 +372,62 @@ export function createWorkflowEngine({
     return outcome;
   }
 
+  // Runs checkApprovalDelays() every `everyMs` (default 5 minutes), so approvals
+  // escalate and expire without anyone calling it. Never two sweeps at once: a
+  // tick that finds one still running is skipped. A sweep that fails (say the
+  // database is down) is written to the audit log and the timer carries on; if
+  // even the audit log cannot be written, onError hears about it.
+  // Returns { tick, stop }: tick() runs one sweep now (as the timer would);
+  // stop() ends the timer and waits for a sweep in progress to finish.
+  // `timers` is replaceable so tests can drive the clock.
+  function startApprovalTimer({
+    everyMs = 5 * 60 * 1000,
+    timers = { setInterval, clearInterval },
+    onError = (err) => { console.error(`approval timer: ${errorText(err)}`); },
+  } = {}) {
+    let running = null;
+    let stopped = false;
+    const stats = { sweeps: 0, skipped: 0, failed: 0 };
+
+    function tick() {
+      if (stopped) return Promise.resolve(null);
+      if (running) { stats.skipped += 1; return running; }
+      running = (async () => {
+        try {
+          const outcome = await checkApprovalDelays();
+          stats.sweeps += 1;
+          return outcome;
+        } catch (err) {
+          stats.failed += 1;
+          try {
+            audit.append({
+              correlationId: 'approval-timer', actor: { type: 'agent', id: agent.id }, action: 'workflow.sweep_failed',
+              rationale: `The approval-delay sweep failed and will run again in ${Math.round(everyMs / 1000)} s: ${errorText(err)}`,
+            });
+          } catch (auditErr) {
+            onError(auditErr);
+          }
+          return null;
+        } finally {
+          running = null;
+        }
+      })();
+      return running;
+    }
+
+    const handle = timers.setInterval(tick, everyMs);
+    handle?.unref?.(); // the timer alone does not keep the process alive
+    return {
+      tick,
+      stats,
+      async stop() {
+        stopped = true;
+        timers.clearInterval(handle);
+        await running;
+      },
+    };
+  }
+
   async function lockedAction(tx, workflowId, step) {
     await tx.query('SELECT id FROM workflow_runs WHERE id = $1 FOR UPDATE', [workflowId]);
     const { rows: [row] } = await tx.query('SELECT * FROM workflow_actions WHERE run_id = $1 AND step = $2', [workflowId, step]);
@@ -515,5 +572,5 @@ export function createWorkflowEngine({
     });
   }
 
-  return { startWorkflow, resumeWorkflow, decide, checkApprovalDelays, getWorkflow, advance };
+  return { startWorkflow, resumeWorkflow, decide, checkApprovalDelays, startApprovalTimer, getWorkflow, advance };
 }

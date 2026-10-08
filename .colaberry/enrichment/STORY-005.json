@@ -107,8 +107,8 @@
       "evidence": "src/automation/workflows.js"
     },
     {
-      "statement": "Approval delays are only acted on when checkApprovalDelays() runs (or someone tries to decide); no scheduler is set up in this build.",
-      "evidence": "src/automation/workflows.js"
+      "statement": "Approval delays are acted on by a timer (startApprovalTimer, every 5 minutes by default), so an escalation or expiry can happen up to one interval late; the timer must be started by whatever hosts the engine.",
+      "evidence": "tests/approval-timer.test.mjs"
     },
     {
       "statement": "A resumed action that had been approved needs approval again, because it is re-classified.",
