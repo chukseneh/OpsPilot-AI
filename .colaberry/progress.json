@@ -354,6 +354,8 @@
         "src/audit/reader.js",
         "src/audit/storage.js",
         "src/demo/audit.js",
+        "src/system.js",
+        ".gitignore",
         "src/orchestration/orchestrator.js",
         "src/risk/service.js",
         "src/inventory/service.js",
@@ -370,7 +372,8 @@
         "tests/audit-decisions.test.mjs",
         "tests/audit-reader.test.mjs",
         "tests/audit-storage.test.mjs",
-        "tests/audit-demo.test.mjs"
+        "tests/audit-demo.test.mjs",
+        "tests/system.test.mjs"
       ],
       "notes": "Secure, append-only audit log: every entry carries a timestamp and user id; 31 named decision actions are refused without a rationale (approvals, rejections and status changes now require a note/reason; automated decisions write their rule reasons). Entries are HMAC-SHA256 signed with AUDIT_LOG_KEY (production refuses to run without it); the log's end is anchored in PostgreSQL in an append-only table with signed anchors, so edits, cut-off tails and insider rewrites are detected. Only security and compliance officers may read the log, every read and refusal is logged, and integrity is checked on every read. A failed write fails closed and alerts once; a health check and a security-officer-only repair set a damaged tail aside without deleting it. Demo: node src/demo/audit.js (synthetic data, throwaway key).",
       "updated_at": "2026-10-09T00:00:00.000Z",

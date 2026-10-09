@@ -40,6 +40,11 @@
       "dimension": "exceptions",
       "value": "If the audit log cannot be written (for example a full disk), the action is refused, an alert fires once, and every later write is refused until a security officer repairs the log; the repair sets the damaged end aside in a separate file rather than deleting it, and refuses if damage is found anywhere before the end.",
       "evidence": "tests/audit-storage.test.mjs"
+    },
+    {
+      "dimension": "security_context",
+      "value": "OpsPilot starts only through startOpsPilot(), which requires AUDIT_LOG_KEY and a database (DATABASE_URL, or PGLITE_DATA_DIR for development), refuses to start on an unhealthy, wrongly keyed or tampered audit log, then starts the approval-delay and anchoring timers; stopping it anchors the final state.",
+      "evidence": "tests/system.test.mjs"
     }
   ],
   "decisions": [
