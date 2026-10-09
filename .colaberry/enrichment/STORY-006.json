@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "1",
+  "projectId": "3704f65e-d372-4085-b821-5b5495f688d0",
+  "storyId": "STORY-006",
+  "projectTruthBaseRevision": 1,
+  "observedAt": "2026-10-09T00:00:00.000Z",
+  "sourceCommitSha": "a9534b7c485d2d39c3460fe0c7396b1c37b2a5cd",
+  "factProposals": [
+    {
+      "dimension": "security_context",
+      "value": "Every audit entry is signed with HMAC-SHA256 using a secret key from the AUDIT_LOG_KEY environment variable (at least 32 characters); the production audit log refuses to start without it, and the key is never written to the log or put in an error.",
+      "evidence": "tests/audit-log-keyed.test.mjs"
+    },
+    {
+      "dimension": "security_context",
+      "value": "The audit log's end is periodically anchored in PostgreSQL (audit_anchors: append-only, enforced by a trigger, each anchor signed with the same key), so an edited entry, a cut-off tail and a rewrite by someone holding the key are all detected.",
+      "evidence": "tests/audit-anchors.test.mjs"
+    },
+    {
+      "dimension": "approval_points",
+      "value": "Only security officers and compliance officers may read the audit log; every read and every refused read is itself logged, and the log's integrity is checked before results are returned.",
+      "evidence": "tests/audit-reader.test.mjs"
+    },
+    {
+      "dimension": "approval_points",
+      "value": "Only a security officer may repair the audit log after a failed write, and must give a reason, which is recorded.",
+      "evidence": "tests/audit-storage.test.mjs"
+    },
+    {
+      "dimension": "data",
+      "value": "Each audit entry holds a sequence number, ISO 8601 timestamp, correlation id, actor (type and id), action, optional subject, rationale, detail, the previous entry's hash, its own hash and the hash algorithm; 31 named decision actions must include a rationale.",
+      "evidence": "src/audit/decisions.js"
+    },
+    {
+      "dimension": "constraints",
+      "value": "Changing an AI system's status in the inventory now requires a reason, and approving or rejecting a high-risk workflow action now requires a note; both are recorded as the decision rationale.",
+      "evidence": "tests/audit-decisions.test.mjs"
+    },
+    {
+      "dimension": "exceptions",
+      "value": "If the audit log cannot be written (for example a full disk), the action is refused, an alert fires once, and every later write is refused until a security officer repairs the log; the repair sets the damaged end aside in a separate file rather than deleting it, and refuses if damage is found anywhere before the end.",
+      "evidence": "tests/audit-storage.test.mjs"
+    }
+  ],
+  "decisions": [
+    {
+      "statement": "Protect the log with keyed (HMAC) hashes and signed anchors stored in PostgreSQL.",
+      "rationale": "A plain hash chain can be recomputed by anyone who edits the file, and cannot detect a cut-off tail. Chosen by the student before building.",
+      "evidence": "src/audit/anchors.js"
+    },
+    {
+      "statement": "Refuse to log a decision without a rationale, and make people give one (a reason for a status change, a note for an approval or rejection) rather than filling in a default.",
+      "rationale": "A default such as 'no reason given' would meet the criterion only on paper. Chosen by the student before building.",
+      "evidence": "src/audit/decisions.js"
+    },
+    {
+      "statement": "Security officers and compliance officers may read the audit log.",
+      "rationale": "Chosen by the student before building.",
+      "evidence": "src/audit/reader.js"
+    },
+    {
+      "statement": "Keep a named list of decision actions; plain actions (a request arriving, a run starting, a view, a system being registered) still need who and when but not a rationale.",
+      "rationale": "Makes 'decision' testable and keeps the requirement on choices, not on every event.",
+      "evidence": "src/audit/decisions.js"
+    },
+    {
+      "statement": "Show a tampered log to its reader with a warning rather than hiding it.",
+      "rationale": "An auditor needs to see what was recorded, and to know it cannot be trusted.",
+      "evidence": "tests/audit-reader.test.mjs"
+    },
+    {
+      "statement": "Only a security officer may repair the log.",
+      "rationale": "Repairing cuts bytes from the log; it is the most sensitive operation on it.",
+      "evidence": "src/audit/storage.js"
+    }
+  ],
+  "limitations": [
+    {
+      "statement": "Entries written after the most recent anchor can still be removed without trace; anchoring runs every 5 minutes by default.",
+      "evidence": "src/audit/anchors.js"
+    },
+    {
+      "statement": "A database superuser can disable the trigger that protects the anchors; a forged anchor is still caught by its signature, but a deleted anchor is only caught if a later one remains.",
+      "evidence": "src/audit/anchors.js"
+    },
+    {
+      "statement": "New log files are owner-only (mode 0600) on Linux and macOS; on Windows these permission bits do not apply and the folder's access settings must protect the file. The permission test is skipped on Windows.",
+      "evidence": "tests/audit-reader.test.mjs"
+    },
+    {
+      "statement": "A refused repair cannot be recorded in a damaged log; it is reported in the error only.",
+      "evidence": "src/audit/storage.js"
+    },
+    {
+      "statement": "The audit log is a single file written by one process; several processes writing the same log are not supported.",
+      "evidence": "src/audit/auditLog.js"
+    },
+    {
+      "statement": "Key rotation is not supported: a keyed log must always be opened with the key it was started with.",
+      "evidence": "src/audit/auditLog.js"
+    },
+    {
+      "statement": "Demos and most older tests still use unkeyed logs; verify() reports keyed: false for them so they cannot pass as securely stored.",
+      "evidence": "tests/audit-log-keyed.test.mjs"
+    }
+  ],
+  "demonstrationEvidence": [
+    { "kind": "test", "ref": "tests/audit-log-keyed.test.mjs" },
+    { "kind": "test", "ref": "tests/audit-anchors.test.mjs" },
+    { "kind": "test", "ref": "tests/audit-decisions.test.mjs" },
+    { "kind": "test", "ref": "tests/audit-reader.test.mjs" },
+    { "kind": "test", "ref": "tests/audit-storage.test.mjs" },
+    { "kind": "test", "ref": "tests/audit-demo.test.mjs" },
+    { "kind": "demo", "ref": "src/demo/audit.js" },
+    { "kind": "commit", "ref": "a9534b7c485d2d39c3460fe0c7396b1c37b2a5cd" }
+  ],
+  "measurementEvents": []
+}
