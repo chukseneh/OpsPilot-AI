@@ -3,13 +3,13 @@
   "project": "OpsPilot AI — Enterprise AI Operations, Workflow & Risk Automation Platform",
   "totals": {
     "stories_total": 12,
-    "stories_verified": 7,
+    "stories_verified": 8,
     "stories_submitted": 0,
-    "stories_in_progress": 5,
+    "stories_in_progress": 4,
     "stories_not_started": 0,
     "criteria_total": 38,
-    "criteria_passed": 23,
-    "points_awarded": 1242
+    "criteria_passed": 26,
+    "points_awarded": 1309
   },
   "stories": [
     {
@@ -375,19 +375,15 @@
       "notes": "Secure, append-only audit log: every entry carries a timestamp and user id; 31 named decision actions are refused without a rationale (approvals, rejections and status changes now require a note/reason; automated decisions write their rule reasons). Entries are HMAC-SHA256 signed with AUDIT_LOG_KEY (production refuses to run without it); the log's end is anchored in PostgreSQL in an append-only table with signed anchors, so edits, cut-off tails and insider rewrites are detected. Only security and compliance officers may read the log, every read and refusal is logged, and integrity is checked on every read. A failed write fails closed and alerts once; a health check and a security-officer-only repair set a damaged tail aside without deleting it. Demo: node src/demo/audit.js (synthetic data, throwaway key).",
       "updated_at": "2026-10-09T00:00:00.000Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 80,
-        "outstanding": [
-          "Given an action is performed, When it is logged, Then it includes a timestamp and user ID.",
-          "Given a decision is made, When it is logged, Then it includes the decision rationale.",
-          "Trust: Logs are immutable and securely stored."
-        ]
+        "verified_at": "2026-10-09T02:50:23.395Z",
+        "commit_sha": "a9534b7c485d2d39c3460fe0c7396b1c37b2a5cd",
+        "commit_url": "https://github.com/chukseneh/OpsPilot-AI/commit/a9534b7c485d2d39c3460fe0c7396b1c37b2a5cd",
+        "commit_at": "2026-10-09T02:48:51Z",
+        "points_awarded": 147,
+        "outstanding": []
       }
     },
     {
