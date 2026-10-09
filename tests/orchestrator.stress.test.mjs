@@ -211,7 +211,7 @@ for (const seed of [1, 7, 42]) {
       const entries = audit.readAll();
       runs.forEach((r, i) => checkOperation({ ...r, result: results[i], entries, calls, seed }));
       checkLog(entries, seed);
-      assert.deepEqual(audit.verify(), { ok: true, count: entries.length });
+      assert.deepEqual(audit.verify(), { ok: true, count: entries.length, keyed: false });
 
       // Replaying completed operations calls no agent.
       const before = [...calls.values()].reduce((a, b) => a + b, 0);

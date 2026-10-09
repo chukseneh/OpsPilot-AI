@@ -52,7 +52,7 @@ test('nothing happens before the escalation time', async () => {
 
 test('after 4 hours it is escalated once: more roles may decide, and one reminder is sent', async () => {
   const { engine, executors, clock, audit, actions } = await setup();
-  await assert.rejects(engine.decide({ user: OPS, workflowId: 'WF-D', step: 1, decision: 'approve' }), PermissionDeniedError);
+  await assert.rejects(engine.decide({ user: OPS, workflowId: 'WF-D', step: 1, decision: 'approve', note: 'test' }), PermissionDeniedError);
 
   clock.advance(5 * HOUR);
   assert.deepEqual(await engine.checkApprovalDelays(), { escalated: ['WF-D:1'], expired: [] });
@@ -77,7 +77,7 @@ test('a compliance officer may also decide once escalated', async () => {
   const { engine, clock } = await setup();
   clock.advance(5 * HOUR);
   await engine.checkApprovalDelays();
-  const wf = await engine.decide({ user: COMPLIANCE, workflowId: 'WF-D', step: 1, decision: 'reject' });
+  const wf = await engine.decide({ user: COMPLIANCE, workflowId: 'WF-D', step: 1, decision: 'reject', note: 'test' });
   assert.equal(wf.run.status, 'rejected');
 });
 
@@ -104,7 +104,7 @@ test('a decision that arrives after the deadline is refused, and the action is e
   clock.advance(5 * HOUR);
   await engine.checkApprovalDelays();
   clock.advance(20 * HOUR); // past the deadline; the sweep has not run since
-  await assert.rejects(engine.decide({ user: OPS, workflowId: 'WF-D', step: 1, decision: 'approve' }), /passed its approval deadline and has expired/);
+  await assert.rejects(engine.decide({ user: OPS, workflowId: 'WF-D', step: 1, decision: 'approve', note: 'test' }), /passed its approval deadline and has expired/);
   const wf = await engine.getWorkflow('WF-D');
   assert.equal(wf.run.status, 'expired');
   assert.equal(executors.payment.calls, 0, 'a late approval never runs the action');
@@ -124,7 +124,7 @@ test('a reminder that cannot be sent is logged; the escalation still stands', as
 
 test('an approval decided in time is left alone by the sweep', async () => {
   const { engine, clock } = await setup();
-  await engine.decide({ user: { id: 'pm-2', role: 'process manager' }, workflowId: 'WF-D', step: 1, decision: 'approve' });
+  await engine.decide({ user: { id: 'pm-2', role: 'process manager' }, workflowId: 'WF-D', step: 1, decision: 'approve', note: 'test' });
   clock.advance(30 * HOUR);
   assert.deepEqual(await engine.checkApprovalDelays(), { escalated: [], expired: [] });
   assert.equal((await engine.getWorkflow('WF-D')).run.status, 'completed');

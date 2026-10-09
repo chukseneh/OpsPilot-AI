@@ -99,7 +99,7 @@ test('the inventory executor changes a status as the automation agent, once', as
 
 test('if the system changed while the action waited, the inventory refuses and the action fails (not retried)', async () => {
   const { inventory, executor } = await inventorySetup();
-  await inventory.updateStatus({ user: { id: 'it-1', role: 'IT manager' }, systemId: 'ai-chat', status: 'paused', expectedVersion: 1 });
+  await inventory.updateStatus({ user: { id: 'it-1', role: 'IT manager' }, systemId: 'ai-chat', status: 'paused', expectedVersion: 1, reason: 'test' });
   await assert.rejects(
     runAction(executor, { systemId: 'ai-chat', status: 'retired', expectedVersion: 1 }, { idempotencyKey: 'wf-2:step-1', ...fast }),
     (err) => err instanceof ActionFailedError && err.attempts === 1 && /InventoryConflictError/.test(err.message),

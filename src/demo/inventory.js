@@ -88,9 +88,9 @@ export async function runInventoryDemo({ print = console.log, databaseUrl = proc
       try { await fn(); return `${label}: unexpectedly allowed`; } catch (err) { return `${label}\n   → ${err.name}: ${err.message}`; }
     };
     out.stale = await attempt('a) Someone retires the CV screener from a screen loaded before the pause (version 1)',
-      () => inventory.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'retired', expectedVersion: 1 }));
+      () => inventory.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'retired', expectedVersion: 1, reason: 'Replaced by a new screening tool' }));
     out.unauthorised = await attempt('b) compliance-officer-1 tries to change a status',
-      () => inventory.updateStatus({ user: OFFICER, systemId: 'ai-help-chat', status: 'retired', expectedVersion: 1 }));
+      () => inventory.updateStatus({ user: OFFICER, systemId: 'ai-help-chat', status: 'retired', expectedVersion: 1, reason: 'No longer needed' }));
     // A closed local port, with an obviously fake password to show it never appears in the error.
     const down = new URL(`postgres://127.0.0.1:${await freePort()}/opspilot`);
     down.username = 'demo';

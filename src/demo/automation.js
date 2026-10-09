@@ -93,7 +93,7 @@ export async function runAutomationDemo({ print = console.log } = {}) {
     ] });
     print(`Workflow: ${wf.run.status}\n${steps(wf)}`);
     try {
-      await engine.decide({ user: STARTER, workflowId: 'WF-bias-review', step: 1, decision: 'approve' });
+      await engine.decide({ user: STARTER, workflowId: 'WF-bias-review', step: 1, decision: 'approve', note: 'My own request; approving it' });
     } catch (err) {
       out.selfApproval = `${err.name}: ${err.message}`;
       print(`\n${STARTER.id} (who started it) tries to approve step 1 → ${out.selfApproval}`);
@@ -113,7 +113,7 @@ export async function runAutomationDemo({ print = console.log } = {}) {
     print(`+25 h: ${expired.expired.join(', ')} expired — treated as rejected. The payment was never made.`);
     print(`Workflow: ${out.expiredWorkflow.run.status}\n${steps(out.expiredWorkflow)}`);
     try {
-      await engine.decide({ user: OPS, workflowId: 'WF-bias-review', step: 3, decision: 'approve' });
+      await engine.decide({ user: OPS, workflowId: 'WF-bias-review', step: 3, decision: 'approve', note: 'Auditor invoice checked' });
     } catch (err) { out.lateApproval = `${err.name}: ${err.message}`; }
     print(`\nA late approval by ${OPS.id} → ${out.lateApproval}`);
 

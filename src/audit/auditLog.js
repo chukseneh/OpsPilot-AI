@@ -4,10 +4,17 @@
 // so editing or removing any line that has entries after it breaks the chain and
 // verify() says where.
 //
+// Keyed hashes (STORY-006): with a `key`, each hash is an HMAC-SHA256 made with
+// that secret key instead of a plain SHA-256. A plain hash can be recomputed by
+// anyone, so someone who edits a line could rewrite every later hash and leave a
+// chain that still verifies; without the key they cannot. Each keyed entry says
+// alg: 'hmac-sha256' (an entry with no alg is plain SHA-256), and a log never
+// mixes the two. In production use openAuditLogFromEnv(), which refuses to run
+// without AUDIT_LOG_KEY. The key is never written to the log or put in an error.
+//
 // Known limit: removing the LAST entries cannot be detected from the file alone —
 // what is left is still a valid chain. Catching that needs the latest hash kept
-// somewhere the file's editor cannot reach (an external anchor); that belongs to
-// STORY-006 ("logs are immutable and securely stored").
+// somewhere the file's editor cannot reach (an external anchor).
 //
 // Fail closed: if an entry cannot be written, append() throws AuditWriteError and
 // the log refuses every later write too (a failed write may have left half a line).
@@ -18,9 +25,13 @@
 
 import { appendFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
+
+import { isDecision } from './decisions.js';
 
 export const GENESIS_HASH = '0'.repeat(64);
+export const KEYED_ALG = 'hmac-sha256';
+export const MIN_KEY_LENGTH = 32;
 
 export class AuditWriteError extends Error {
   constructor(message, options) {
@@ -61,11 +72,10 @@ function redact(value) {
 const isEntry = (e) => e !== null && typeof e === 'object' && !Array.isArray(e)
   && Number.isInteger(e.seq) && typeof e.hash === 'string' && typeof e.prevHash === 'string';
 
-const sha256 = (text) => createHash('sha256').update(text).digest('hex');
-
-// Fixed key order, so the same entry always hashes the same way.
+// Fixed key order, so the same entry always hashes the same way. `alg` is only
+// present on keyed entries, so plain entries hash exactly as they always did.
 function body(e) {
-  return {
+  const b = {
     seq: e.seq,
     at: e.at,
     correlationId: e.correlationId,
@@ -76,16 +86,43 @@ function body(e) {
     detail: e.detail ?? {},
     prevHash: e.prevHash,
   };
+  if (e.alg) b.alg = e.alg;
+  return b;
 }
 
-const hashOf = (e) => sha256(JSON.stringify(body(e)));
+const algOf = (e) => e.alg ?? 'sha256';
+// With a key: HMAC-SHA256, which cannot be recomputed without the key.
+const hashOf = (e, key) => {
+  const text = JSON.stringify(body(e));
+  return key ? createHmac('sha256', key).update(text).digest('hex') : createHash('sha256').update(text).digest('hex');
+};
+
+// Production: the key comes from AUDIT_LOG_KEY and the log will not open without it.
+export function openAuditLogFromEnv({ file, env = process.env, now } = {}) {
+  const key = env.AUDIT_LOG_KEY;
+  if (typeof key !== 'string' || key.length === 0) {
+    throw new AuditWriteError('AUDIT_LOG_KEY is not set; the audit log will not run without its signing key.');
+  }
+  return createAuditLog({ file, key, now });
+}
 
 const readText = (file) => (existsSync(file) ? readFileSync(file, 'utf8') : '');
 const toLines = (text) => text.split('\n').filter((l) => l.trim() !== '');
 const readLines = (file) => toLines(readText(file));
 
-export function createAuditLog({ file, now = () => new Date() }) {
+// onWriteFailure(err) is called once, on the first failed write, so someone hears
+// about it at once (not just through a stream of refused actions). `write` is the
+// function that appends to the file; tests replace it to simulate a full disk.
+export function createAuditLog({
+  file, now = () => new Date(), key,
+  onWriteFailure = (err) => { console.error(`AUDIT LOG WRITE FAILED (${file}): ${err?.message ?? err}. Every later action will be refused until this is fixed.`); },
+  write = appendFileSync,
+} = {}) {
   if (!file) throw new AuditWriteError('createAuditLog needs a file path');
+  if (key !== undefined && (typeof key !== 'string' || key.length < MIN_KEY_LENGTH)) {
+    throw new AuditWriteError(`The audit log key must be at least ${MIN_KEY_LENGTH} characters.`);
+  }
+  const alg = key ? KEYED_ALG : 'sha256';
 
   // Pick up where the file left off, so restarts continue the same chain.
   let last = null;
@@ -108,6 +145,13 @@ export function createAuditLog({ file, now = () => new Date() }) {
     if (!isEntry(last)) {
       throw new AuditWriteError(`Audit log ${file} ends with a line that is not an audit entry; refusing to extend it`);
     }
+    // Never mix keyed and plain entries, and never extend a keyed log with the wrong key.
+    if (algOf(last) !== alg) {
+      throw new AuditWriteError(`Audit log ${file} uses ${algOf(last)} hashes but was opened ${key ? 'with' : 'without'} a key; refusing to extend it`);
+    }
+    if (key && last.hash !== hashOf(last, key)) {
+      throw new AuditWriteError(`Audit log ${file}: its last entry does not match this key (wrong key, or the entry was changed); refusing to extend it`);
+    }
   }
 
   // Set by the first failed write. From then on the file's tail is unknown, so
@@ -121,6 +165,11 @@ export function createAuditLog({ file, now = () => new Date() }) {
       !action && 'action',
     ].filter(Boolean);
     if (missing.length) throw new AuditWriteError(`Audit entry is missing ${missing.join(', ')}`);
+    // A decision without its "why" is refused, like any other incomplete entry:
+    // the caller's action stops rather than being recorded without a rationale.
+    if (isDecision(action) && (typeof rationale !== 'string' || rationale.trim() === '')) {
+      throw new AuditWriteError(`"${action}" records a decision, so it must include its rationale`);
+    }
     if (failedWrite) {
       throw new AuditWriteError(
         `Audit log ${file} refused "${action}": an earlier write failed and may have left half a line. Check the file, then restart.`,
@@ -138,14 +187,22 @@ export function createAuditLog({ file, now = () => new Date() }) {
       rationale: rationale == null ? rationale : redact(rationale),
       detail: redact(detail ?? {}),
       prevHash: last?.hash ?? GENESIS_HASH,
+      alg: key ? KEYED_ALG : undefined,
     });
-    entry.hash = hashOf(entry);
+    entry.hash = hashOf(entry, key);
 
     try {
       mkdirSync(dirname(file), { recursive: true });
-      appendFileSync(file, `${JSON.stringify(entry)}\n`);
+      // mode 0o600: when the file is first created, only its owner may read or write it
+      // (Linux/macOS; Windows does not use these permission bits).
+      write(file, `${JSON.stringify(entry)}\n`, { mode: 0o600 });
     } catch (err) {
       failedWrite = err;
+      try {
+        onWriteFailure(err);
+      } catch (alertErr) {
+        console.error(`audit log: the write-failure alert itself failed: ${alertErr?.message ?? alertErr}`);
+      }
       throw new AuditWriteError(`Could not write audit entry "${action}" to ${file}`, { cause: err });
     }
     last = entry;
@@ -156,27 +213,38 @@ export function createAuditLog({ file, now = () => new Date() }) {
     return readLines(file).map((l) => JSON.parse(l));
   }
 
-  // Recompute every hash and check every link. Reports the first broken entry.
-  function verify() {
-    let prevHash = GENESIS_HASH;
-    let expectedSeq = 1;
-    const all = readLines(file);
-    for (const [i, line] of all.entries()) {
-      let e;
-      try {
-        e = JSON.parse(line);
-      } catch {
-        return { ok: false, brokenAt: i + 1, reason: 'line is not valid JSON' };
-      }
-      if (!isEntry(e)) return { ok: false, brokenAt: i + 1, reason: 'line is not an audit entry' };
-      if (e.seq !== expectedSeq) return { ok: false, brokenAt: e.seq, reason: `expected seq ${expectedSeq}` };
-      if (e.prevHash !== prevHash) return { ok: false, brokenAt: e.seq, reason: 'prevHash does not match the previous entry' };
-      if (e.hash !== hashOf(e)) return { ok: false, brokenAt: e.seq, reason: 'entry was changed after it was written' };
-      prevHash = e.hash;
-      expectedSeq += 1;
-    }
-    return { ok: true, count: all.length };
-  }
+  return {
+    file, append, readAll,
+    verify: () => verifyAuditFile({ file, key }),
+    get writeFailed() { return failedWrite !== null; },
+  };
+}
 
-  return { file, append, readAll, verify };
+// Recompute every hash and check every link; reports the first broken entry.
+// Read-only, so it can check a file that createAuditLog() would refuse to extend.
+// `keyed` says whether the hashes were checked with the secret key: an unkeyed
+// log can only show it is internally consistent, not that nobody rewrote it.
+export function verifyAuditFile({ file, key }) {
+  const keyed = Boolean(key);
+  const alg = keyed ? KEYED_ALG : 'sha256';
+  const broken = (brokenAt, reason) => ({ ok: false, brokenAt, reason, keyed });
+  let prevHash = GENESIS_HASH;
+  let expectedSeq = 1;
+  const all = readLines(file);
+  for (const [i, line] of all.entries()) {
+    let e;
+    try {
+      e = JSON.parse(line);
+    } catch {
+      return broken(i + 1, 'line is not valid JSON');
+    }
+    if (!isEntry(e)) return broken(i + 1, 'line is not an audit entry');
+    if (e.seq !== expectedSeq) return broken(e.seq, `expected seq ${expectedSeq}`);
+    if (algOf(e) !== alg) return broken(e.seq, `entry uses ${algOf(e)} hashes; this check uses ${alg}`);
+    if (e.prevHash !== prevHash) return broken(e.seq, 'prevHash does not match the previous entry');
+    if (e.hash !== hashOf(e, key)) return broken(e.seq, 'entry was changed after it was written');
+    prevHash = e.hash;
+    expectedSeq += 1;
+  }
+  return { ok: true, count: all.length, keyed };
 }

@@ -55,7 +55,7 @@ test('approved: the high-risk action runs, low-risk steps carry on, the next hig
   assert.equal((await inventory.listSystems({ user: IT })).systems[0].status, 'paused');
   assert.equal(executors.payment.calls, 0);
 
-  const after3 = await engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 3, decision: 'approve' });
+  const after3 = await engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 3, decision: 'approve', note: 'test' });
   assert.equal(after3.run.status, 'completed');
   assert.equal(executors.payment.done().length, 1);
   assert.equal(executors.notify.done().length, 2);
@@ -85,7 +85,7 @@ test('rejected: the action and every later step do not run; the workflow stops',
 
 test('the person who started a workflow cannot approve its high-risk actions', async () => {
   const { engine, decisions } = await setup();
-  await assert.rejects(engine.decide({ user: STARTER, workflowId: 'WF-A', step: 1, decision: 'approve' }),
+  await assert.rejects(engine.decide({ user: STARTER, workflowId: 'WF-A', step: 1, decision: 'approve', note: 'test' }),
     (err) => err instanceof WorkflowRequestError && /started a workflow may not decide/.test(err.message));
   assert.equal((await engine.getWorkflow('WF-A')).actions[0].status, 'awaiting_approval');
   assert.equal(decisions().at(-1).action, 'workflow.decision_refused');
@@ -94,9 +94,9 @@ test('the person who started a workflow cannot approve its high-risk actions', a
 test('before escalation only a process manager may decide; other roles are refused and logged', async () => {
   const { engine, decisions } = await setup();
   for (const role of ['operations manager', 'compliance officer', 'IT manager']) {
-    await assert.rejects(engine.decide({ user: { id: `u-${role}`, role }, workflowId: 'WF-A', step: 1, decision: 'approve' }), PermissionDeniedError);
+    await assert.rejects(engine.decide({ user: { id: `u-${role}`, role }, workflowId: 'WF-A', step: 1, decision: 'approve', note: 'test' }), PermissionDeniedError);
   }
-  await assert.rejects(engine.decide({ workflowId: 'WF-A', step: 1, decision: 'approve' }), PermissionDeniedError);
+  await assert.rejects(engine.decide({ workflowId: 'WF-A', step: 1, decision: 'approve', note: 'test' }), PermissionDeniedError);
   const denied = decisions().filter((x) => x.action === 'workflow.denied');
   assert.equal(denied.length, 4);
   assert.match(denied[0].rationale, /before it is escalated; allowed roles: process manager/);
@@ -104,27 +104,27 @@ test('before escalation only a process manager may decide; other roles are refus
 
 test('deciding twice the same way changes nothing; deciding the other way is refused', async () => {
   const { engine, executors } = await setup();
-  await engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 1, decision: 'approve' });
-  const again = await engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 1, decision: 'approve' });
+  await engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 1, decision: 'approve', note: 'test' });
+  const again = await engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 1, decision: 'approve', note: 'test' });
   assert.equal(again.actions[0].status, 'succeeded');
   assert.equal(executors.notify.done().length, 1, 'nothing ran twice');
-  await assert.rejects(engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 1, decision: 'reject' }), /already approved by pm-2/);
-  await assert.rejects(engine.decide({ user: { id: 'pm-3', role: 'process manager' }, workflowId: 'WF-A', step: 1, decision: 'approve' }), /already approved by pm-2/);
+  await assert.rejects(engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 1, decision: 'reject', note: 'test' }), /already approved by pm-2/);
+  await assert.rejects(engine.decide({ user: { id: 'pm-3', role: 'process manager' }, workflowId: 'WF-A', step: 1, decision: 'approve', note: 'test' }), /already approved by pm-2/);
 });
 
 test('only the step that is waiting can be decided; bad requests are refused and logged', async () => {
   const { engine, decisions } = await setup();
-  await assert.rejects(engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 2, decision: 'approve' }), /not waiting for approval \(it is pending\)/);
-  await assert.rejects(engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 9, decision: 'approve' }), /has no step 9/);
-  await assert.rejects(engine.decide({ user: APPROVER, workflowId: 'WF-none', step: 1, decision: 'approve' }), /no workflow WF-none/);
-  await assert.rejects(engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 1, decision: 'maybe' }), /"approve" or "reject"/);
+  await assert.rejects(engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 2, decision: 'approve', note: 'test' }), /not waiting for approval \(it is pending\)/);
+  await assert.rejects(engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 9, decision: 'approve', note: 'test' }), /has no step 9/);
+  await assert.rejects(engine.decide({ user: APPROVER, workflowId: 'WF-none', step: 1, decision: 'approve', note: 'test' }), /no workflow WF-none/);
+  await assert.rejects(engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 1, decision: 'maybe', note: 'test' }), /"approve" or "reject"/);
   assert.equal(decisions().filter((x) => x.action === 'workflow.decision_refused').length, 4);
 });
 
 test('if the system changed while the action waited, the approved action fails instead of acting on stale data', async () => {
   const { engine, inventory } = await setup();
   await inventory.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'retired', expectedVersion: 1, reason: 'Decommissioned' });
-  const wf = await engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 1, decision: 'approve' });
+  const wf = await engine.decide({ user: APPROVER, workflowId: 'WF-A', step: 1, decision: 'approve', note: 'test' });
   assert.equal(wf.run.status, 'failed');
   assert.match(wf.actions[0].error, /InventoryConflictError/);
   assert.equal((await inventory.listSystems({ user: IT })).systems[0].status, 'retired', 'the newer change stands');

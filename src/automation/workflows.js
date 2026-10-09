@@ -266,6 +266,7 @@ export function createWorkflowEngine({
       return new WorkflowRequestError(`Decision refused: ${why}`);
     };
     if (decision !== 'approve' && decision !== 'reject') throw refuse('decision must be "approve" or "reject"');
+    if (!isNonEmpty(note)) throw refuse(`a note is required: say why you ${decision} (it is recorded as the decision rationale)`);
 
     const outcome = await change(log, async (tx, logChange) => {
       const { rows: [run] } = await tx.query('SELECT * FROM workflow_runs WHERE id = $1 FOR UPDATE', [workflowId]);
@@ -529,7 +530,11 @@ export function createWorkflowEngine({
         [workflowId, action.step, JSON.stringify(params), level, JSON.stringify(reasons), high ? 'awaiting_approval' : 'pending',
           high ? at.toISOString() : null, high ? new Date(at.getTime() + deadlineMs).toISOString() : null],
       );
-      logChange('workflow.action_classified', { subject: `step ${action.step}`, detail: { step: action.step, type: action.type, riskLevel: level, reasons } });
+      logChange('workflow.action_classified', {
+        subject: `step ${action.step}`,
+        rationale: `${level === 'high' ? 'High' : 'Low'} risk: ${reasons.map((r) => r.why).join(' ')}`,
+        detail: { step: action.step, type: action.type, riskLevel: level, reasons },
+      });
       if (high) {
         await tx.query("UPDATE workflow_runs SET status = 'awaiting_approval', updated_at = now() WHERE id = $1", [workflowId]);
         logChange('workflow.approval_requested', {

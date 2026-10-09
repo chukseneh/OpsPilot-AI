@@ -205,7 +205,8 @@ export function createInventoryService({
 
     const bad = !isNonEmpty(systemId) ? 'systemId is required'
       : !SYSTEM_STATUSES.includes(status) ? `status must be one of: ${SYSTEM_STATUSES.join(', ')}`
-        : !Number.isInteger(expectedVersion) ? 'expectedVersion is required: the version of the system you last read' : null;
+        : !Number.isInteger(expectedVersion) ? 'expectedVersion is required: the version of the system you last read'
+          : !isNonEmpty(reason) ? 'reason is required: say why the status is changing (it is recorded as the decision rationale)' : null;
     if (bad) {
       log('inventory.update_rejected', { subject: systemId ?? null, rationale: bad, detail: { status: status ?? null } });
       throw new InventoryRequestError(`Status change rejected: ${bad}`);
@@ -301,6 +302,7 @@ export function createInventoryService({
         const after = fromRow(updated);
         logChange('inventory.risk_recorded', {
           subject: current.id,
+          rationale: `Rating ${after.riskLevel} taken from completed risk assessment ${assessmentId} (assessed ${new Date(assessedAt).toISOString()}); it replaces ${current.riskLevel}.`,
           detail: { from: current.riskLevel, to: after.riskLevel, assessmentId, version: after.version },
         });
         outcome.recorded.push(current.id);

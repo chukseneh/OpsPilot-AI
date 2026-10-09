@@ -134,8 +134,8 @@ test('registering the same system twice creates it once', async () => {
 test('repeating a status change (e.g. a retry) changes nothing the second time', async () => {
   const { service } = await setup();
   await service.registerSystem({ user: IT, system: system() });
-  await service.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'paused', expectedVersion: 1 });
-  const again = await service.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'paused', expectedVersion: 1 });
+  await service.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'paused', expectedVersion: 1, reason: 'test' });
+  const again = await service.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'paused', expectedVersion: 1, reason: 'test' });
   assert.equal(again.changed, false);
   assert.equal(again.system.version, 2, 'not bumped twice');
 });
@@ -145,9 +145,9 @@ test('repeating a status change (e.g. a retry) changes nothing the second time',
 test('a status change based on an out-of-date read is refused, not applied over the newer change', async () => {
   const { service, actions } = await setup();
   await service.registerSystem({ user: IT, system: system() });
-  await service.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'paused', expectedVersion: 1 });
+  await service.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'paused', expectedVersion: 1, reason: 'test' });
   await assert.rejects(
-    service.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'retired', expectedVersion: 1 }),
+    service.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'retired', expectedVersion: 1, reason: 'test' }),
     (err) => err instanceof InventoryConflictError && /you read version 1, it is now version 2, status paused/.test(err.message),
   );
   assert.equal((await service.listSystems({ user: IT })).systems[0].status, 'paused');
@@ -166,9 +166,9 @@ test('incomplete system data is refused with each problem named', async () => {
   const { owner, ...noOwner } = system();
   await assert.rejects(service.registerSystem({ user: IT, system: noOwner }),
     (err) => err instanceof InventoryRequestError && /"owner" is missing/.test(err.message));
-  await assert.rejects(service.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'live', expectedVersion: 1 }), /status must be one of/);
-  await assert.rejects(service.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'paused' }), /expectedVersion is required/);
-  await assert.rejects(service.updateStatus({ user: IT, systemId: 'nope', status: 'paused', expectedVersion: 1 }), SystemNotFoundError);
+  await assert.rejects(service.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'live', expectedVersion: 1, reason: 'test' }), /status must be one of/);
+  await assert.rejects(service.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'paused', reason: 'test' }), /expectedVersion is required/);
+  await assert.rejects(service.updateStatus({ user: IT, systemId: 'nope', status: 'paused', expectedVersion: 1, reason: 'test' }), SystemNotFoundError);
   assert.deepEqual(actions(), ['inventory.register_rejected', 'inventory.update_rejected', 'inventory.update_rejected', 'inventory.update_rejected']);
 });
 
@@ -193,7 +193,7 @@ test('a stored row that breaks the rules is shown as an inconsistency, not hidde
 test('a role that may only view cannot change anything; the refusal is logged', async () => {
   const { service, actions, audit } = await setup();
   await service.registerSystem({ user: IT, system: system() });
-  await assert.rejects(service.updateStatus({ user: COMPLIANCE, systemId: 'ai-cv-screen', status: 'retired', expectedVersion: 1 }), PermissionDeniedError);
+  await assert.rejects(service.updateStatus({ user: COMPLIANCE, systemId: 'ai-cv-screen', status: 'retired', expectedVersion: 1, reason: 'test' }), PermissionDeniedError);
   await assert.rejects(service.registerSystem({ user: COMPLIANCE, system: chat() }), PermissionDeniedError);
   assert.equal((await service.listSystems({ user: IT })).systems[0].status, 'active');
   const denied = audit.readAll().filter((e) => e.action === 'inventory.denied');
@@ -224,7 +224,7 @@ test('a database that cannot be reached is reported and logged; nothing is claim
   const dead = { query: async () => { throw down; }, exec: async () => { throw down; }, transaction: async () => { throw down; } };
   const service = createInventoryService({ db: dead, audit });
   await assert.rejects(service.listSystems({ user: IT }), DatabaseUnavailableError);
-  await assert.rejects(service.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'paused', expectedVersion: 1 }), DatabaseUnavailableError);
+  await assert.rejects(service.updateStatus({ user: IT, systemId: 'ai-cv-screen', status: 'paused', expectedVersion: 1, reason: 'test' }), DatabaseUnavailableError);
   const entries = audit.readAll();
   assert.deepEqual(entries.map((e) => [e.action, e.detail.attempted]), [['inventory.db_unavailable', 'view'], ['inventory.db_unavailable', 'update status']]);
   assert.ok(!entries.some((e) => e.action === 'inventory.viewed' || e.action === 'inventory.status_changed'));

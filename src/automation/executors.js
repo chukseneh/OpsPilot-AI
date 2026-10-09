@@ -102,7 +102,9 @@ export function createInventoryStatusExecutor({ inventory, agent = AUTOMATION_AG
         systemId: params.systemId,
         status: params.status,
         expectedVersion: params.expectedVersion,
-        reason: params.reason ?? null,
+        // The inventory requires a reason. Without one from the workflow's author,
+        // point at the workflow step, whose audit entries hold the risk decision and any approval.
+        reason: params.reason ?? `Requested by workflow step ${idempotencyKey}; see that step's risk classification and approval in the audit log.`,
         requestId: idempotencyKey,
       });
       return { systemId: r.system.id, status: r.system.status, version: r.system.version, changed: r.changed };

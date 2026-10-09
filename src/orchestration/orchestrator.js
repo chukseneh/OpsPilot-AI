@@ -204,7 +204,11 @@ export function createOrchestrator({
           if (kind === 'fail') return { ok: false, error: err, attempts: attempt, taskFailed: true };
           if (!willRetry) return { ok: false, error: err, attempts: attempt };
           const waitMs = retryDelay(err, attempt);
-          log('task.retry_scheduled', { subject: task.id, detail: { agentId: agent.id, nextAttempt: attempt + 1, waitMs } });
+          log('task.retry_scheduled', {
+            subject: task.id,
+            rationale: `${agent.id} failed attempt ${attempt} with ${err?.name ?? 'an error'}, which can clear on its own; trying the same agent again in ${waitMs} ms.`,
+            detail: { agentId: agent.id, nextAttempt: attempt + 1, waitMs },
+          });
           await sleep(waitMs, operation.signal);
         }
       }

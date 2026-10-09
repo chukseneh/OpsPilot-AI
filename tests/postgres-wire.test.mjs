@@ -75,9 +75,9 @@ test('inventory over the wire: text[] and timestamps come back as JS values; sta
   assert.equal(typeof system.version, 'number');
   assert.ok(!Number.isNaN(Date.parse(system.createdAt)));
 
-  const changed = await inventory.updateStatus({ user: IT, systemId: cv.id, status: 'paused', expectedVersion: 1 });
+  const changed = await inventory.updateStatus({ user: IT, systemId: cv.id, status: 'paused', expectedVersion: 1, reason: 'test' });
   assert.deepEqual([changed.changed, changed.system.status, changed.system.version], [true, 'paused', 2]);
-  await assert.rejects(inventory.updateStatus({ user: IT, systemId: cv.id, status: 'retired', expectedVersion: 1 }), InventoryConflictError);
+  await assert.rejects(inventory.updateStatus({ user: IT, systemId: cv.id, status: 'retired', expectedVersion: 1, reason: 'test' }), InventoryConflictError);
   assert.equal((await inventory.listSystems({ user: IT })).systems[0].status, 'paused');
 });
 
@@ -123,7 +123,7 @@ test('workflows over the wire: jsonb round-trips; low runs, high waits, approval
   assert.ok(Array.isArray(wf.actions[1].riskReasons));
   assert.equal(wf.actions[1].params.expectedVersion, 1);
 
-  const done = await wfEngine.decide({ user: PM2, workflowId: 'WF-wire', step: 2, decision: 'approve' });
+  const done = await wfEngine.decide({ user: PM2, workflowId: 'WF-wire', step: 2, decision: 'approve', note: 'test' });
   assert.equal(done.run.status, 'completed');
   assert.equal((await inventory.listSystems({ user: IT })).systems[0].status, 'paused');
   assert.equal(audit.verify().ok, true);

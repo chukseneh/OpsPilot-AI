@@ -171,7 +171,13 @@ export function createRiskAssessmentService({
           systemStatus: system.status, riskLevel: overallRiskLevel(risks), risks,
         };
         assessed.push(result);
-        log('risk.system_assessed', { subject: system.id, detail: result });
+        log('risk.system_assessed', {
+          subject: system.id,
+          rationale: risks.length
+            ? `Rated ${result.riskLevel}: ${risks.map((r) => `${r.category.replace(/_/g, ' ')} ${r.severity} (${r.rule})`).join('; ')}.`
+            : `Rated ${result.riskLevel}: no rule raised a risk.`,
+          detail: result,
+        });
       }
     } finally {
       clearTimeout(timer);

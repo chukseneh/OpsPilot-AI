@@ -86,7 +86,7 @@ test('a system changed after it was assessed keeps its old rating and is reporte
   const { inventory, assess } = await setup();
   const result = await assess('RA-3');
   await new Promise((r) => { setTimeout(r, 5); });
-  await inventory.updateStatus({ user: IT, systemId: 'ai-forecast', status: 'retired', expectedVersion: 1 });
+  await inventory.updateStatus({ user: IT, systemId: 'ai-forecast', status: 'retired', expectedVersion: 1, reason: 'test' });
   const outcome = await inventory.recordRiskAssessment({ user: OFFICER, result });
   assert.deepEqual(outcome.recorded, ['ai-cv-screen']);
   assert.deepEqual(outcome.skipped, [{ systemId: 'ai-forecast', reason: 'it was changed after it was assessed; assess it again' }]);

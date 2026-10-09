@@ -22,7 +22,7 @@ test('entries are numbered and chained, and the chain verifies', () => {
   assert.equal(b.seq, 2);
   assert.equal(b.prevHash, a.hash);
   assert.equal(b.rationale, 'agent has the process capability');
-  assert.deepEqual(log.verify(), { ok: true, count: 2 });
+  assert.deepEqual(log.verify(), { ok: true, count: 2, keyed: false });
 });
 
 test('a reopened log continues the same chain', () => {
@@ -37,9 +37,9 @@ test('a reopened log continues the same chain', () => {
 test('editing a past entry is detected', () => {
   const file = tempFile();
   const log = createAuditLog({ file });
-  log.append(event('task.assigned', { detail: { agentId: 'agent-a' } }));
+  log.append(event('task.assigned', { rationale: 'agent-a has the capability and is healthy', detail: { agentId: 'agent-a' } }));
   log.append(event('task.completed'));
-  writeFileSync(file, readFileSync(file, 'utf8').replace('agent-a', 'agent-z'));
+  writeFileSync(file, readFileSync(file, 'utf8').replace('"agentId":"agent-a"', '"agentId":"agent-z"'));
   const result = log.verify();
   assert.equal(result.ok, false);
   assert.equal(result.brokenAt, 1);
@@ -127,7 +127,7 @@ test('a line that is valid JSON but not an entry is reported, not crashed on or 
   log.append(event('two'));
   const [a, b] = readFileSync(file, 'utf8').trim().split('\n');
   writeFileSync(file, `${a}\nnull\n${b}\n`);
-  assert.deepEqual(createAuditLog({ file }).verify(), { ok: false, brokenAt: 2, reason: 'line is not an audit entry' });
+  assert.deepEqual(createAuditLog({ file }).verify(), { ok: false, brokenAt: 2, reason: 'line is not an audit entry', keyed: false });
 
   writeFileSync(file, `${a}\n${b}\n[]\n`);
   assert.throws(() => createAuditLog({ file }), /not an audit entry/);
