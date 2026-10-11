@@ -103,7 +103,7 @@
       "evidence": "src/documents/extract.js"
     },
     {
-      "statement": "The password-protected PDF path is tested through its error mapping, not with a real encrypted PDF.",
+      "statement": "Password-protected PDFs are never opened, even when the uploader knows the password; they are flagged and an unprotected copy is needed. Tested with a real encrypted PDF (standard security handler, RC4 40-bit); stronger AES-encrypted PDFs take the same pdfjs path but are not generated in the tests.",
       "evidence": "tests/document-formats.test.mjs"
     },
     {

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { readDocument, pdfOpenError, UnsupportedFormatError, DocumentReadError } from '../src/documents/formats.js';
-import { makeTextPdf, makeImageOnlyPdf } from '../src/demo/makePdf.js';
+import { makeTextPdf, makeImageOnlyPdf, makeEncryptedPdf } from '../src/demo/makePdf.js';
 
 const bytesOf = (s) => new TextEncoder().encode(s);
 const unsupported = (pattern) => (err) => err instanceof UnsupportedFormatError && pattern.test(err.message);
@@ -78,14 +78,29 @@ test('broken JSON, non-UTF-8 text and a corrupt PDF are refused with the reason'
   await assert.rejects(readDocument({ fileName: 'i.pdf', bytes: bytesOf('%PDF-1.4\nthis is not really a pdf') }), readErr('malformed'));
 });
 
-test('pdfjs errors are turned into clear messages: password-protected, or unreadable', () => {
-  // pdfjs raises PasswordException for an encrypted PDF. Building a real encrypted PDF
-  // in a test is impractical, so this checks the mapping the real reader uses.
-  const locked = pdfOpenError(Object.assign(new Error('No password given'), { name: 'PasswordException' }));
-  assert.ok(readErr('encrypted')(locked));
-  assert.match(locked.message, /password-protected; upload an unprotected copy/);
+test('a real password-protected PDF is refused with a clear message, through the real pdfjs path', async () => {
+  // A genuinely encrypted PDF (PDF standard security handler): pdfjs itself raises
+  // PasswordException, and the reader turns it into a message the uploader can act on.
+  await assert.rejects(readDocument({ fileName: 'locked.pdf', bytes: makeEncryptedPdf(['Invoice number: INV-77', 'Total: 10.00 GBP']) }),
+    (err) => readErr('encrypted')(err) && /password-protected; upload an unprotected copy/.test(err.message) && err.cause?.name === 'PasswordException');
+});
+
+test('the test PDF really is encrypted: it opens with its password and not without', async () => {
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const bytes = makeEncryptedPdf(['Invoice number: INV-77'], { userPassword: 'open-sesame' });
+  const open = async (password) => {
+    const task = pdfjs.getDocument({ data: new Uint8Array(bytes), password, isEvalSupported: false, verbosity: 0 });
+    try { const doc = await task.promise; return (await (await doc.getPage(1)).getTextContent()).items.map((i) => i.str).join(''); } finally { await task.destroy(); }
+  };
+  await assert.rejects(open(undefined), { name: 'PasswordException' });
+  await assert.rejects(open('wrong'), { name: 'PasswordException' });
+  assert.equal(await open('open-sesame'), 'Invoice number: INV-77');
+});
+
+test('other pdfjs failures are reported as unreadable', () => {
   const broken = pdfOpenError(Object.assign(new Error('Invalid PDF structure.'), { name: 'InvalidPDFException' }));
   assert.ok(readErr('malformed')(broken));
+  assert.match(broken.message, /could not be read \(InvalidPDFException: Invalid PDF structure\.\)/);
 });
 
 test('a PDF that takes too long to read is stopped', async () => {

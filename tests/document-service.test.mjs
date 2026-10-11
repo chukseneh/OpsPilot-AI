@@ -14,7 +14,7 @@ import { UnsupportedFormatError, DocumentReadError } from '../src/documents/form
 import { openPGlite } from '../src/inventory/db.js';
 import { createAuditLog, AuditWriteError } from '../src/audit/auditLog.js';
 import { isDecision } from '../src/audit/decisions.js';
-import { makeTextPdf, makeImageOnlyPdf } from '../src/demo/makePdf.js';
+import { makeTextPdf, makeImageOnlyPdf, makeEncryptedPdf } from '../src/demo/makePdf.js';
 
 const ANALYST = { id: 'fa-1', role: 'financial analyst' };
 const PM = { id: 'pm-1', role: 'process manager' };
@@ -86,6 +86,14 @@ test('a scanned PDF, broken JSON and a corrupt PDF are stored and flagged, not r
     assert.deepEqual(doc.fields, {});
     assert.match(doc.flags[0].problem, reason);
   }
+});
+
+test('a password-protected PDF is stored and flagged, telling the uploader to send an unprotected copy', async () => {
+  const { service, audit } = await setup();
+  const doc = await service.uploadDocument({ user: PM, fileName: 'locked.pdf', kind: 'invoice', bytes: makeEncryptedPdf(['Invoice number: INV-77', 'Total: 10.00 GBP']) });
+  assert.deepEqual([doc.status, doc.fields], ['flagged_for_review', {}]);
+  assert.match(doc.flags[0].problem, /password-protected; upload an unprotected copy/);
+  assert.match(audit.readAll().find((e) => e.action === 'document.flagged').rationale, /password-protected/);
 });
 
 // ---- Failure path: unsupported document format (refused; nothing stored) ----
