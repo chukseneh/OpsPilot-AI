@@ -396,21 +396,39 @@
       "criteria": [
         {
           "text": "Given a document is uploaded, When it is processed, Then structured information is extracted.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given a document is uploaded, When it contains errors, Then the system flags it for review.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: Document processing actions are logged.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/documents/formats.js",
+        "src/documents/extract.js",
+        "src/documents/blobStore.js",
+        "src/documents/service.js",
+        "src/demo/makePdf.js",
+        "src/demo/documents.js",
+        "src/audit/decisions.js",
+        "package.json",
+        "package-lock.json",
+        "docs/stories/STORY-007.md",
+        ".colaberry/enrichment/STORY-007.json"
+      ],
+      "tests_added": [
+        "tests/document-formats.test.mjs",
+        "tests/document-extract.test.mjs",
+        "tests/document-service.test.mjs",
+        "tests/document-review.test.mjs",
+        "tests/documents-demo.test.mjs"
+      ],
+      "notes": "Document upload and structured extraction in our own code: .txt, .csv, .json and text PDFs (pdfjs-dist 6.4.299+, script evaluation off, 10 s read limit), format decided by content. Invoices yield number, supplier, issue/due dates, currency, total (plus subtotal, tax, line items, cross-checked); contracts yield parties, effective date, end date or term, value, currency, renewal. Anything missing, ambiguous, impossible or not adding up is flagged for review, never guessed; scanned PDFs are flagged as needing OCR. Unsupported formats and empty/oversize files are refused and nothing is stored; storage failure records nothing. Files are stored once by SHA-256; repeat uploads return the same document. Any known role uploads; compliance officers and financial analysts review (never their own upload, note required), and corrections must pass the same checks. Every upload, outcome, review, view and refusal is audited. Demo: node src/demo/documents.js (synthetic documents).",
+      "updated_at": "2026-10-11T00:00:00.000Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,

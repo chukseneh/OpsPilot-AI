@@ -27,8 +27,8 @@ the same criteria out of `.colaberry/progress.json`, which Claude Code keeps in
 step (see the managed block in CLAUDE.md). Ticking something you have not
 actually met only misleads you.
 
-- [ ] Given a document is uploaded, When it is processed, Then structured information is extracted.
-- [ ] Given a document is uploaded, When it contains errors, Then the system flags it for review.
-- [ ] Trust: Document processing actions are logged.
+- [x] Given a document is uploaded, When it is processed, Then structured information is extracted.
+- [x] Given a document is uploaded, When it contains errors, Then the system flags it for review.
+- [x] Trust: Document processing actions are logged.
 
 When every box above is ticked, stop and show the demo.

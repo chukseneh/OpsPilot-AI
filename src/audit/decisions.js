@@ -29,6 +29,9 @@ export const DECISION_ACTIONS = Object.freeze(new Set([
   'workflow.approval_escalated', 'workflow.approval_expired',
   // The audit log itself (STORY-006)
   'audit.read_denied', 'audit.repaired',
+  // Documents (STORY-007)
+  'document.denied', 'document.rejected', 'document.extracted', 'document.flagged',
+  'document.review_accepted', 'document.review_rejected', 'document.review_refused',
 ]));
 
 export const isDecision = (action) => DECISION_ACTIONS.has(action);
