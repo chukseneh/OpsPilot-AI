@@ -2,9 +2,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, appendFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { randomBytes } from 'node:crypto';
 
 import { startOpsPilot, StartupRefusedError } from '../src/system.js';
@@ -111,6 +111,49 @@ test('the key never appears in any refusal', async () => {
     try { await startOpsPilot({ env: bad, timers }); assert.fail('should refuse'); } catch (err) {
       assert.ok(!err.message.includes(env.AUDIT_LOG_KEY) && !err.message.includes(otherKey));
     }
+  }
+});
+
+test('documents: an upload through the started system is extracted, its file kept, logged in the KEYED log, and still there after a restart', async () => {
+  const env = envFor();
+  const PM = { id: 'pm-1', role: 'process manager' };
+  const ANALYST = { id: 'fa-1', role: 'financial analyst' };
+  const invoice = new TextEncoder().encode('Invoice number: INV-1\nSupplier: Contoso\nInvoice date: 2026-09-01\nDue date: 2026-09-30\nTotal: 120.00 GBP\n');
+
+  const first = await startOpsPilot({ env, timers });
+  let doc;
+  try {
+    doc = await first.services.documents.uploadDocument({ user: PM, fileName: 'inv-1.txt', bytes: invoice });
+    assert.equal(doc.status, 'extracted');
+    assert.equal(doc.fields.total.value, 120);
+    const logged = first.audit.readAll().filter((e) => e.action.startsWith('document.'));
+    assert.deepEqual(logged.map((e) => e.action), ['document.uploaded', 'document.extracted']);
+    assert.ok(logged.every((e) => e.alg === 'hmac-sha256'), 'document entries are signed with the key');
+  } finally {
+    await first.stop();
+  }
+  assert.ok(existsSync(join(dirname(env.AUDIT_LOG_FILE), 'documents', doc.sha256)), 'the file is kept beside the log by default');
+
+  const second = await startOpsPilot({ env, timers });
+  try {
+    const again = await second.services.documents.getDocument({ user: ANALYST, documentId: doc.id });
+    assert.deepEqual([again.status, again.fields.invoice_number.value], ['extracted', 'INV-1']);
+    const repeat = await second.services.documents.uploadDocument({ user: PM, fileName: 'inv-1.txt', bytes: invoice });
+    assert.equal(repeat.id, doc.id, 'a repeat upload after a restart is still recognised');
+    assert.equal((await second.anchors.verify()).ok, true);
+  } finally {
+    await second.stop();
+  }
+});
+
+test('DOCUMENTS_DIR puts uploaded files somewhere else', async () => {
+  const env = { ...envFor(), DOCUMENTS_DIR: join(mkdtempSync(join(tmpdir(), 'opspilot-docs-')), 'store') };
+  const system = await startOpsPilot({ env, timers });
+  try {
+    const doc = await system.services.documents.uploadDocument({ user: { id: 'pm-1', role: 'process manager' }, fileName: 'a.txt', bytes: new TextEncoder().encode('Total: 1.00 GBP') });
+    assert.ok(existsSync(join(env.DOCUMENTS_DIR, doc.sha256)));
+  } finally {
+    await system.stop();
   }
 });
 

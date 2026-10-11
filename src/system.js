@@ -5,7 +5,7 @@
 // ONE way to start the system, and it cannot start with them off:
 //
 //   const system = await startOpsPilot({ env: process.env });
-//   system.services.inventory / .risk / .workflows / .auditReader
+//   system.services.inventory / .risk / .workflows / .auditReader / .documents
 //   await system.stop();
 //
 // Settings (environment variables — never put them in a file in this repo):
@@ -14,6 +14,7 @@
 //   PGLITE_DATA_DIR   a folder for a local PGlite database (development)
 //   AUDIT_LOG_FILE    default data/audit.jsonl
 //   AUDIT_LOG_ID      default "main" (which anchors belong to this log)
+//   DOCUMENTS_DIR     where uploaded files are kept; default "documents" beside the audit log
 //
 // Startup is refused — with the reason, and never the key — when a setting is
 // missing, when the log's storage is unhealthy (e.g. a half-written last line:
@@ -34,6 +35,8 @@ import { createRiskAssessmentService } from './risk/service.js';
 import { createWorkflowEngine, migrateWorkflows } from './automation/workflows.js';
 import { createInventoryStatusExecutor } from './automation/executors.js';
 import { createFileResultStore } from './orchestration/resultStore.js';
+import { createDocumentService, migrateDocuments } from './documents/service.js';
+import { createFileBlobStore } from './documents/blobStore.js';
 
 export class StartupRefusedError extends Error {
   constructor(message, options) { super(message, options); this.name = 'StartupRefusedError'; }
@@ -75,6 +78,7 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
     await migrate(db);
     await migrateWorkflows(db);
     await migrateAnchors(db);
+    await migrateDocuments(db);
   } catch (err) {
     await closeDb();
     throw err;
@@ -95,6 +99,9 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
     risk: createRiskAssessmentService({ audit, store: createFileResultStore({ file: join(dirname(file), 'risk-assessments.json') }) }),
     workflows: createWorkflowEngine({ db, audit, executors: { 'inventory.update_status': createInventoryStatusExecutor({ inventory }), ...executors } }),
     auditReader: createAuditReader({ audit, file, key: env.AUDIT_LOG_KEY, anchors }),
+    documents: createDocumentService({
+      db, audit, blobs: createFileBlobStore({ dir: resolve(env.DOCUMENTS_DIR ?? join(dirname(file), 'documents')) }),
+    }),
   };
 
   // ---- 7. Record the start, anchor it, and start the timers ----

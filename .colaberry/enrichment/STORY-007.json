@@ -111,8 +111,8 @@
       "evidence": "src/documents/blobStore.js"
     },
     {
-      "statement": "Uploads are not yet wired into startOpsPilot() or exposed over HTTP; the service is called directly.",
-      "evidence": "src/system.js"
+      "statement": "Uploads run through startOpsPilot() (services.documents, files under DOCUMENTS_DIR, the keyed audit log) but are not exposed over HTTP yet; callers use the service directly.",
+      "evidence": "tests/system.test.mjs"
     }
   ],
   "demonstrationEvidence": [
