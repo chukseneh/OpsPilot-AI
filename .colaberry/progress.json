@@ -3,13 +3,13 @@
   "project": "OpsPilot AI — Enterprise AI Operations, Workflow & Risk Automation Platform",
   "totals": {
     "stories_total": 12,
-    "stories_verified": 8,
+    "stories_verified": 9,
     "stories_submitted": 0,
-    "stories_in_progress": 4,
+    "stories_in_progress": 3,
     "stories_not_started": 0,
     "criteria_total": 38,
-    "criteria_passed": 26,
-    "points_awarded": 1309
+    "criteria_passed": 29,
+    "points_awarded": 1376
   },
   "stories": [
     {
@@ -430,19 +430,15 @@
       "notes": "Document upload and structured extraction in our own code: .txt, .csv, .json and text PDFs (pdfjs-dist 6.4.299+, script evaluation off, 10 s read limit), format decided by content. Invoices yield number, supplier, issue/due dates, currency, total (plus subtotal, tax, line items, cross-checked); contracts yield parties, effective date, end date or term, value, currency, renewal. Anything missing, ambiguous, impossible or not adding up is flagged for review, never guessed; scanned PDFs are flagged as needing OCR. Unsupported formats and empty/oversize files are refused and nothing is stored; storage failure records nothing. Files are stored once by SHA-256; repeat uploads return the same document. Any known role uploads; compliance officers and financial analysts review (never their own upload, note required), and corrections must pass the same checks. Every upload, outcome, review, view and refusal is audited. Demo: node src/demo/documents.js (synthetic documents).",
       "updated_at": "2026-10-11T00:00:00.000Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 80,
-        "outstanding": [
-          "Given a document is uploaded, When it is processed, Then structured information is extracted.",
-          "Given a document is uploaded, When it contains errors, Then the system flags it for review.",
-          "Trust: Document processing actions are logged."
-        ]
+        "verified_at": "2026-10-11T00:52:08.540Z",
+        "commit_sha": "2ff1dbd4af68b16a2dad8c11d49fe9cc45f99cb6",
+        "commit_url": "https://github.com/chukseneh/OpsPilot-AI/commit/2ff1dbd4af68b16a2dad8c11d49fe9cc45f99cb6",
+        "commit_at": "2026-10-11T00:49:01Z",
+        "points_awarded": 147,
+        "outstanding": []
       }
     },
     {
