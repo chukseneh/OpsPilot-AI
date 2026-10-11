@@ -1,0 +1,128 @@
+{
+  "schemaVersion": "1",
+  "projectId": "3704f65e-d372-4085-b821-5b5495f688d0",
+  "storyId": "STORY-007",
+  "projectTruthBaseRevision": 1,
+  "observedAt": "2026-10-11T00:00:00.000Z",
+  "sourceCommitSha": "2ff1dbd4af68b16a2dad8c11d49fe9cc45f99cb6",
+  "factProposals": [
+    {
+      "dimension": "inputs",
+      "value": "Users upload documents as plain text (.txt), CSV (.csv, either a field,value sheet or a line-items table), JSON (.json) or PDF with a text layer (.pdf), up to 10 MB; the format is decided from the file's content and must match its name.",
+      "evidence": "src/documents/formats.js"
+    },
+    {
+      "dimension": "outputs",
+      "value": "Invoices yield invoice number, supplier, issue date, due date, currency and total (plus subtotal, tax and line items when present); contracts yield parties, effective date, end date or term, contract value, currency and renewal terms. Each value records where in the document it came from.",
+      "evidence": "src/documents/extract.js"
+    },
+    {
+      "dimension": "data",
+      "value": "Documents are stored in PostgreSQL (documents table: status extracted, flagged_for_review, reviewed or rejected; fields and flags as JSON; reviewer and note); the files themselves are kept once each under their SHA-256 fingerprint, and the database holds only that reference.",
+      "evidence": "src/documents/service.js"
+    },
+    {
+      "dimension": "exceptions",
+      "value": "A document is flagged for review, never guessed at, when a required field is missing, a date is ambiguous (e.g. 03/04/2026) or impossible, an amount or currency is unclear, two different values appear for one field, the figures do not add up, a contract has fewer than two parties, or the PDF has no text layer.",
+      "evidence": "tests/document-extract.test.mjs"
+    },
+    {
+      "dimension": "exceptions",
+      "value": "Unsupported formats (images, Office files, archives, programs) and empty or oversize files are refused with nothing stored; supported files that cannot be read (broken JSON, corrupt or password-protected PDF, read timeout) are stored and flagged; if storing a file fails, nothing is recorded as uploaded.",
+      "evidence": "tests/document-service.test.mjs"
+    },
+    {
+      "dimension": "approval_points",
+      "value": "Flagged documents are reviewed by a compliance officer or financial analyst, never the person who uploaded them; a note is required, and an accept with corrections must pass the same checks as extraction.",
+      "evidence": "tests/document-review.test.mjs"
+    },
+    {
+      "dimension": "actors",
+      "value": "A new role appears: financial analyst (from STORY-008's narrative), who reviews flagged documents alongside the compliance officer.",
+      "evidence": "src/documents/service.js"
+    },
+    {
+      "dimension": "security_context",
+      "value": "Every document upload, extraction outcome, review, view and refusal is in the audit log; outcomes and reviews are decisions with their rationale. Uploaders see only their own documents; to anyone else a document that is not theirs looks the same as one that does not exist.",
+      "evidence": "tests/document-service.test.mjs"
+    },
+    {
+      "dimension": "constraints",
+      "value": "PDFs are read with pdfjs-dist 6.4.299 or later, with script evaluation disabled: versions 5.6.83 to 6.2.107 let a malicious PDF run code (GHSA-hq66-cqwq-w95j).",
+      "evidence": "package.json"
+    }
+  ],
+  "decisions": [
+    {
+      "statement": "Accept text, CSV, JSON and text-layer PDFs; flag scanned PDFs as needing OCR rather than reading them.",
+      "rationale": "OCR misreads amounts and dates; a wrong figure read silently is worse than a flag. Chosen by the student before building.",
+      "evidence": "src/documents/formats.js"
+    },
+    {
+      "statement": "Extract invoices and contracts, each with a fixed list of required fields.",
+      "rationale": "Chosen by the student before building.",
+      "evidence": "src/documents/extract.js"
+    },
+    {
+      "statement": "Any known role may upload and see its own documents; compliance officers and financial analysts review flagged ones, never their own upload.",
+      "rationale": "Chosen by the student before building; the own-upload rule keeps the reviewer independent.",
+      "evidence": "src/documents/service.js"
+    },
+    {
+      "statement": "Refuse files that are not a supported kind, but store and flag supported files that cannot be read.",
+      "rationale": "The uploader and reviewers can then see a broken invoice and why, instead of it vanishing.",
+      "evidence": "src/documents/service.js"
+    },
+    {
+      "statement": "Keep the document's own figures when they do not add up, and flag them, rather than correcting them.",
+      "rationale": "A system that silently fixes a total hides exactly what a reviewer needs to see.",
+      "evidence": "tests/document-extract.test.mjs"
+    },
+    {
+      "statement": "One document per uploader and content; the file stored once by its fingerprint.",
+      "rationale": "Uploading the same file twice must not create or process it twice.",
+      "evidence": "tests/document-service.test.mjs"
+    },
+    {
+      "statement": "Check a reviewer's corrections with the same extraction rules, by re-running extraction on the corrected values.",
+      "rationale": "A review must not be a way to save values that would have been flagged.",
+      "evidence": "src/documents/service.js"
+    }
+  ],
+  "limitations": [
+    {
+      "statement": "No OCR: scanned or photographed documents are flagged and must be typed in by a reviewer.",
+      "evidence": "src/documents/formats.js"
+    },
+    {
+      "statement": "Fields are found only under a fixed list of labels (e.g. 'Total due', 'Invoice date') and invoice line items only in the form '- Description  qty x price = amount'; other layouts yield missing-field flags.",
+      "evidence": "src/documents/extract.js"
+    },
+    {
+      "statement": "Amounts are read only in the 1,250.00 style; 1.250,00 is flagged as unreadable. A bare '$' is flagged as ambiguous.",
+      "evidence": "src/documents/extract.js"
+    },
+    {
+      "statement": "The password-protected PDF path is tested through its error mapping, not with a real encrypted PDF.",
+      "evidence": "tests/document-formats.test.mjs"
+    },
+    {
+      "statement": "Files are stored on the local disk; uploads are not virus-scanned.",
+      "evidence": "src/documents/blobStore.js"
+    },
+    {
+      "statement": "Uploads are not yet wired into startOpsPilot() or exposed over HTTP; the service is called directly.",
+      "evidence": "src/system.js"
+    }
+  ],
+  "demonstrationEvidence": [
+    { "kind": "test", "ref": "tests/document-formats.test.mjs" },
+    { "kind": "test", "ref": "tests/document-extract.test.mjs" },
+    { "kind": "test", "ref": "tests/document-service.test.mjs" },
+    { "kind": "test", "ref": "tests/document-review.test.mjs" },
+    { "kind": "test", "ref": "tests/documents-demo.test.mjs" },
+    { "kind": "demo", "ref": "src/demo/documents.js" },
+    { "kind": "commit", "ref": "2ff1dbd4af68b16a2dad8c11d49fe9cc45f99cb6" }
+  ],
+  "measurementEvents": []
+}
