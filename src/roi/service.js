@@ -15,8 +15,8 @@
 //                the warnings, who and when
 //
 // Trust: every calculation is logged as roi.calculated WITH THE FULL ASSUMPTIONS,
-// the headline figures and every warning, inside the database transaction; every
-// refusal is logged with its reason.
+// the headline figures, every warning and the thresholds that were applied,
+// inside the database transaction; every refusal is logged with its reason.
 //
 // Idempotent: the same scenarioId with the same assumptions returns the saved
 // scenario; the same id with different assumptions is refused (use a new id).
@@ -26,9 +26,9 @@ import { roleAllowed } from '../lib/roles.js';
 import { PermissionDeniedError } from '../analysis/service.js';
 import { validateAssumptions, RoiInputError } from './assumptions.js';
 import { calculateRoi, formatMoney, CalculationError } from './calculate.js';
-import { checkAssumptions } from './checks.js';
+import { checkAssumptions, resolveThresholds, RoiThresholdError } from './checks.js';
 
-export { PermissionDeniedError, RoiInputError, CalculationError };
+export { PermissionDeniedError, RoiInputError, CalculationError, RoiThresholdError };
 export const ROI_ROLES = Object.freeze(['financial analyst', 'operations manager']);
 
 export class RoiRequestError extends Error {
@@ -74,7 +74,10 @@ function summarise(result, warnings) {
 }
 
 // lookupAnalysis(id) / lookupDocument(id, user) give the checks their evidence.
-export function createRoiService({ db, audit, lookupAnalysis = async () => null, lookupDocument = async () => null, thresholds }) {
+// `thresholds` overrides the plausibility defaults (checks.js); it is checked here,
+// once, so an impossible setting fails at start-up, not on someone's estimate.
+export function createRoiService({ db, audit, lookupAnalysis = async () => null, lookupDocument = async () => null, thresholds: overrides }) {
+  const thresholds = resolveThresholds(overrides);
   function authorise(user, correlationId, what) {
     if (!isNonEmpty(user?.id)) {
       const why = 'No user was given; ROI estimates are only made for a known user.';
@@ -156,6 +159,7 @@ export function createRoiService({ db, audit, lookupAnalysis = async () => null,
               roiPercent: result[k].roiPercent, paybackMonths: result[k].paybackMonths,
             }])),
             warnings,
+            thresholds, // the exact rules the warnings came from, even after the defaults change
           },
         }));
         return fromRow(row);

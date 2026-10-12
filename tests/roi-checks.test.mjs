@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import { validateAssumptions } from '../src/roi/assumptions.js';
 import { calculateRoi } from '../src/roi/calculate.js';
-import { checkAssumptions } from '../src/roi/checks.js';
+import { checkAssumptions, resolveThresholds, RoiThresholdError } from '../src/roi/checks.js';
 
 const build = (over = {}) => {
   const r = validateAssumptions({
@@ -102,6 +102,27 @@ test('a lookup that fails or hangs becomes a warning, not a crash and not a sile
   assert.match(failing[0].message, /could not be checked \(database unavailable\); the assumption is unconfirmed/);
   const hanging = await checkAssumptions(a, calculateRoi(a), { lookupDocument: () => new Promise(() => {}), thresholds: { lookupTimeoutMs: 20 } });
   assert.match(hanging[0].message, /took longer than 20 ms/);
+});
+
+test('thresholds can be set for an organisation, and change which warnings appear', async () => {
+  const a = build({ timeSavings: [{ label: 'Enter invoice', casesPerYear: 6000, minutesPerCase: 6, automationRate: 0.8, costPerHour: 32 }] });
+  assert.ok(!codes(await check(a)).includes('cost_per_hour_unusual'), 'GBP 32 an hour is fine by default');
+  const strict = await checkAssumptions(a, calculateRoi(a), { thresholds: { minCostPerHour: 40, maxCostPerHour: 120 } });
+  assert.match(strict.find((w) => w.code === 'cost_per_hour_unusual').message, /outside the usual 40–120/);
+});
+
+test('impossible thresholds are refused, every problem listed, so a typo cannot switch a check off', () => {
+  assert.equal(resolveThresholds().maxAutomationRate, 0.9, 'defaults when nothing is set');
+  assert.equal(resolveThresholds({ maxCostPerHour: 120 }).maxCostPerHour, 120);
+  assert.ok(Object.isFrozen(resolveThresholds()));
+  assert.throws(() => resolveThresholds({ minCostPerHour: 200, maxCostPerHour: 100, maxAutomationRate: 1.5, lookupTimeoutMs: 0, maxCostPerHuor: 50 }),
+    (err) => err instanceof RoiThresholdError && err.problems.length === 4
+      && /"maxCostPerHuor" is not a threshold/.test(err.message)
+      && /maxAutomationRate must be more than 0 and at most 1 \(got 1.5\)/.test(err.message)
+      && /minCostPerHour \(200\) must be below maxCostPerHour \(100\)/.test(err.message)
+      && /lookupTimeoutMs must be a whole number of milliseconds/.test(err.message));
+  assert.throws(() => resolveThresholds({ maxRoiPercent: Number.NaN }), /maxRoiPercent must be a finite number/);
+  assert.throws(() => resolveThresholds('strict'), /must be an object/);
 });
 
 test('warnings never change the numbers', async () => {

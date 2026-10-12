@@ -39,6 +39,47 @@ export const DEFAULT_THRESHOLDS = Object.freeze({
   lookupTimeoutMs: 5000,
 });
 
+export class RoiThresholdError extends Error {
+  constructor(problems) {
+    super(`The ROI thresholds are not valid: ${problems.join('; ')}`);
+    this.name = 'RoiThresholdError';
+    this.problems = problems;
+  }
+}
+
+// The thresholds a deployment may set (e.g. a cost-per-hour range for its own
+// currency). Anything impossible is refused, so a typo cannot quietly switch a
+// check off. Returns the full set in use: the defaults with the overrides applied.
+export function resolveThresholds(overrides = {}) {
+  const problems = [];
+  if (overrides === null || typeof overrides !== 'object' || Array.isArray(overrides)) {
+    throw new RoiThresholdError(['must be an object of threshold: value']);
+  }
+  for (const key of Object.keys(overrides)) {
+    if (!(key in DEFAULT_THRESHOLDS)) problems.push(`"${key}" is not a threshold (known: ${Object.keys(DEFAULT_THRESHOLDS).join(', ')})`);
+  }
+  const t = { ...DEFAULT_THRESHOLDS, ...overrides };
+  const rule = (key, ok, text) => {
+    if (typeof t[key] !== 'number' || !Number.isFinite(t[key])) problems.push(`${key} must be a finite number (got ${JSON.stringify(t[key])})`);
+    else if (!ok(t[key])) problems.push(`${key} ${text} (got ${t[key]})`);
+  };
+  rule('maxAutomationRate', (v) => v > 0 && v <= 1, 'must be more than 0 and at most 1');
+  rule('minCostPerHour', (v) => v >= 0, 'must be at least 0');
+  rule('maxCostPerHour', (v) => v > 0, 'must be more than 0');
+  if (Number.isFinite(t.minCostPerHour) && Number.isFinite(t.maxCostPerHour) && t.minCostPerHour >= t.maxCostPerHour) {
+    problems.push(`minCostPerHour (${t.minCostPerHour}) must be below maxCostPerHour (${t.maxCostPerHour})`);
+  }
+  rule('maxHoursPerItem', (v) => v > 0, 'must be more than 0');
+  rule('maxRoiPercent', (v) => v > 0, 'must be more than 0');
+  rule('minPaybackMonths', (v) => v >= 0, 'must be at least 0');
+  rule('analysisTolerance', (v) => v > 0, 'must be more than 0');
+  rule('documentTolerance', (v) => v >= 0, 'must be at least 0');
+  rule('minObservedDays', (v) => v >= 0, 'must be at least 0');
+  rule('lookupTimeoutMs', (v) => Number.isInteger(v) && v >= 1 && v <= 60000, 'must be a whole number of milliseconds from 1 to 60000');
+  if (problems.length) throw new RoiThresholdError(problems);
+  return Object.freeze(t);
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const pct = (x) => `${Math.round(x * 100)}%`;
 const differs = (assumed, observed, tolerance) => observed === 0 ? assumed !== 0 : Math.abs(assumed - observed) / observed > tolerance;
@@ -55,7 +96,7 @@ async function withTimeout(promise, ms, what) {
 export async function checkAssumptions(a, result, {
   lookupAnalysis = async () => null, lookupDocument = async () => null, thresholds = {},
 } = {}) {
-  const t = { ...DEFAULT_THRESHOLDS, ...thresholds };
+  const t = resolveThresholds(thresholds);
   const warnings = [];
   const warn = (kind, code, path, message) => warnings.push({ kind, code, path, message });
   const money = (minor) => formatMoney(minor, a.currency);

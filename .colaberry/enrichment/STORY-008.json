@@ -89,8 +89,8 @@
       "evidence": "src/roi/calculate.js"
     },
     {
-      "statement": "Plausibility thresholds are fixed defaults (configurable in code, not by users), and the cost-per-hour range does not vary by currency or country.",
-      "evidence": "src/roi/checks.js"
+      "statement": "Plausibility thresholds are set per deployment (startOpsPilot roiThresholds, checked at start-up and logged with every calculation), not per user or per estimate; one set applies to every currency in that deployment.",
+      "evidence": "tests/system.test.mjs"
     },
     {
       "statement": "Only assumptions explicitly linked to evidence are cross-checked; unlinked assumptions get plausibility checks only.",

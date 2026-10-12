@@ -8,7 +8,7 @@ import { join } from 'node:path';
 
 import {
   createRoiService, migrateRoi, documentLookupFrom, analysisLookupFrom,
-  PermissionDeniedError, RoiInputError, CalculationError, RoiRequestError, RoiScenarioNotFoundError,
+  PermissionDeniedError, RoiInputError, CalculationError, RoiRequestError, RoiScenarioNotFoundError, RoiThresholdError,
 } from '../src/roi/service.js';
 import { createDocumentService, migrateDocuments } from '../src/documents/service.js';
 import { createFileBlobStore } from '../src/documents/blobStore.js';
@@ -156,6 +156,17 @@ test('only financial analysts and operations managers may calculate or view; ref
   const denied = entries().filter((x) => x.action === 'roi.denied');
   assert.equal(denied.length, 3);
   assert.ok(entries().every((x) => x.at && x.actor.id && (!isDecision(x.action) || x.rationale)));
+});
+
+test('the thresholds applied are logged with each calculation, and a bad setting fails when the service is created', async () => {
+  const { audit } = await setup();
+  const service = createRoiService({ db: pg, audit, thresholds: { maxCostPerHour: 30 } });
+  const s = await service.calculateRoiScenario({ user: ANALYST, scenarioId: 'ROI-12', assumptions: ASSUMPTIONS });
+  assert.deepEqual(s.warnings.map((w) => w.code), ['cost_per_hour_unusual'], 'GBP 32 an hour is above this organisation\'s 30');
+  const logged = audit.readAll().find((e) => e.action === 'roi.calculated').detail.thresholds;
+  assert.equal(logged.maxCostPerHour, 30);
+  assert.equal(logged.maxAutomationRate, 0.9, 'the full set is logged, defaults included');
+  assert.throws(() => createRoiService({ db: pg, audit, thresholds: { maxCostPerHour: -1 } }), RoiThresholdError);
 });
 
 test('if the audit log fails, the scenario is not saved', async () => {

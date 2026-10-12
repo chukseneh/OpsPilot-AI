@@ -184,6 +184,25 @@ test('ROI: a calculation through the started system is saved, logged with its as
   }
 });
 
+test('ROI thresholds: an impossible setting refuses start-up before anything is opened; a valid one is applied', async () => {
+  const env = envFor();
+  await assert.rejects(startOpsPilot({ env, timers, roiThresholds: { minCostPerHour: 100, maxCostPerHour: 50 } }),
+    refused(/ROI thresholds are not valid: minCostPerHour \(100\) must be below maxCostPerHour \(50\)/));
+  assert.ok(!existsSync(env.AUDIT_LOG_FILE), 'nothing was written');
+
+  const system = await startOpsPilot({ env, timers, roiThresholds: { maxCostPerHour: 30 } });
+  try {
+    const s = await system.services.roi.calculateRoiScenario({ user: { id: 'fa-1', role: 'financial analyst' }, scenarioId: 'ROI-T', assumptions: {
+      name: 'x', currency: 'GBP', horizonYears: 1,
+      timeSavings: [{ label: 'Step', casesPerYear: 100, minutesPerCase: 10, automationRate: 0.5, costPerHour: 32 }],
+      costs: { oneOff: [{ label: 'Setup', amount: 100 }] }, uncertainty: { savings: 0.1 },
+    } });
+    assert.deepEqual(s.warnings.map((w) => w.code), ['cost_per_hour_unusual']);
+  } finally {
+    await system.stop();
+  }
+});
+
 test('only the real executor is wired by default: a stand-in action type fails cleanly', async () => {
   const env = envFor();
   const system = await startOpsPilot({ env, timers });

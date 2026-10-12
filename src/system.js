@@ -38,6 +38,7 @@ import { createFileResultStore } from './orchestration/resultStore.js';
 import { createDocumentService, migrateDocuments } from './documents/service.js';
 import { createFileBlobStore } from './documents/blobStore.js';
 import { createRoiService, migrateRoi, analysisLookupFrom, documentLookupFrom } from './roi/service.js';
+import { resolveThresholds } from './roi/checks.js';
 
 export class StartupRefusedError extends Error {
   constructor(message, options) { super(message, options); this.name = 'StartupRefusedError'; }
@@ -48,11 +49,18 @@ const SYSTEM = { type: 'system', id: 'opspilot' };
 // `executors` adds action types beyond the one real executor this build has
 // (inventory status changes). Others fail cleanly ("No executor") until a real
 // connector is supplied — the system never quietly uses a stand-in.
-export async function startOpsPilot({ env = process.env, executors = {}, timers = {} } = {}) {
+// `roiThresholds` overrides the ROI plausibility thresholds (src/roi/checks.js),
+// e.g. { minCostPerHour: 15, maxCostPerHour: 120 } for this organisation.
+export async function startOpsPilot({ env = process.env, executors = {}, timers = {}, roiThresholds = {} } = {}) {
   // ---- 1. Settings ----
   if (!env.AUDIT_LOG_KEY) throw new StartupRefusedError('AUDIT_LOG_KEY is not set; OpsPilot will not start without the audit log signing key.');
   if (!env.DATABASE_URL && !env.PGLITE_DATA_DIR) {
     throw new StartupRefusedError('No database is configured: set DATABASE_URL (PostgreSQL) or PGLITE_DATA_DIR (a local development folder).');
+  }
+  try {
+    resolveThresholds(roiThresholds); // checked before anything is opened
+  } catch (err) {
+    throw new StartupRefusedError(err.message, { cause: err });
   }
   const file = resolve(env.AUDIT_LOG_FILE ?? join('data', 'audit.jsonl'));
   const logId = env.AUDIT_LOG_ID ?? 'main';
@@ -111,6 +119,7 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
       db, audit,
       lookupAnalysis: analysisLookupFrom(createFileResultStore({ file: join(dirname(file), 'analyses.json') })),
       lookupDocument: documentLookupFrom(documents),
+      thresholds: roiThresholds,
     }),
   };
 
