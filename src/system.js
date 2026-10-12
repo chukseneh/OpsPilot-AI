@@ -5,7 +5,7 @@
 // ONE way to start the system, and it cannot start with them off:
 //
 //   const system = await startOpsPilot({ env: process.env });
-//   system.services.inventory / .risk / .workflows / .auditReader / .documents
+//   system.services.inventory / .risk / .workflows / .auditReader / .documents / .roi
 //   await system.stop();
 //
 // Settings (environment variables — never put them in a file in this repo):
@@ -37,6 +37,7 @@ import { createInventoryStatusExecutor } from './automation/executors.js';
 import { createFileResultStore } from './orchestration/resultStore.js';
 import { createDocumentService, migrateDocuments } from './documents/service.js';
 import { createFileBlobStore } from './documents/blobStore.js';
+import { createRoiService, migrateRoi, analysisLookupFrom, documentLookupFrom } from './roi/service.js';
 
 export class StartupRefusedError extends Error {
   constructor(message, options) { super(message, options); this.name = 'StartupRefusedError'; }
@@ -79,6 +80,7 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
     await migrateWorkflows(db);
     await migrateAnchors(db);
     await migrateDocuments(db);
+    await migrateRoi(db);
   } catch (err) {
     await closeDb();
     throw err;
@@ -94,13 +96,21 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
 
   // ---- 6. Services, all writing to the one keyed log ----
   const inventory = createInventoryService({ db, audit });
+  const documents = createDocumentService({
+    db, audit, blobs: createFileBlobStore({ dir: resolve(env.DOCUMENTS_DIR ?? join(dirname(file), 'documents')) }),
+  });
   const services = {
     inventory,
+    documents,
     risk: createRiskAssessmentService({ audit, store: createFileResultStore({ file: join(dirname(file), 'risk-assessments.json') }) }),
     workflows: createWorkflowEngine({ db, audit, executors: { 'inventory.update_status': createInventoryStatusExecutor({ inventory }), ...executors } }),
     auditReader: createAuditReader({ audit, file, key: env.AUDIT_LOG_KEY, anchors }),
-    documents: createDocumentService({
-      db, audit, blobs: createFileBlobStore({ dir: resolve(env.DOCUMENTS_DIR ?? join(dirname(file), 'documents')) }),
+    // ROI checks its assumptions against saved process analyses (the STORY-002 store
+    // beside the log) and against documents, read with the asking user's access rights.
+    roi: createRoiService({
+      db, audit,
+      lookupAnalysis: analysisLookupFrom(createFileResultStore({ file: join(dirname(file), 'analyses.json') })),
+      lookupDocument: documentLookupFrom(documents),
     }),
   };
 

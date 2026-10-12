@@ -32,6 +32,8 @@ export const DECISION_ACTIONS = Object.freeze(new Set([
   // Documents (STORY-007)
   'document.denied', 'document.rejected', 'document.extracted', 'document.flagged',
   'document.review_accepted', 'document.review_rejected', 'document.review_refused',
+  // ROI estimates (STORY-008)
+  'roi.denied', 'roi.rejected', 'roi.calculated', 'roi.calculation_failed',
 ]));
 
 export const isDecision = (action) => DECISION_ACTIONS.has(action);

@@ -157,6 +157,33 @@ test('DOCUMENTS_DIR puts uploaded files somewhere else', async () => {
   }
 });
 
+test('ROI: a calculation through the started system is saved, logged with its assumptions in the KEYED log, and kept across a restart', async () => {
+  const env = envFor();
+  const ANALYST = { id: 'fa-1', role: 'financial analyst' };
+  const assumptions = {
+    name: 'Automate invoice entry', currency: 'GBP', horizonYears: 3,
+    timeSavings: [{ label: 'Enter invoice', casesPerYear: 6000, minutesPerCase: 6, automationRate: 0.8, costPerHour: 32 }],
+    costs: { oneOff: [{ label: 'Implementation', amount: 12000 }], perYear: [{ label: 'Licence', amount: 4800 }] },
+    uncertainty: { savings: 0.2, costs: 0.1 },
+  };
+  const first = await startOpsPilot({ env, timers });
+  try {
+    const s = await first.services.roi.calculateRoiScenario({ user: ANALYST, scenarioId: 'ROI-1', assumptions });
+    assert.equal(s.status, 'ok');
+    const entry = first.audit.readAll().find((e) => e.action === 'roi.calculated');
+    assert.deepEqual(entry.detail.assumptions, assumptions);
+    assert.equal(entry.alg, 'hmac-sha256');
+  } finally {
+    await first.stop();
+  }
+  const second = await startOpsPilot({ env, timers });
+  try {
+    assert.equal((await second.services.roi.getRoiScenario({ user: ANALYST, scenarioId: 'ROI-1' })).result.expected.annualSavings, 1536000);
+  } finally {
+    await second.stop();
+  }
+});
+
 test('only the real executor is wired by default: a stand-in action type fails cleanly', async () => {
   const env = envFor();
   const system = await startOpsPilot({ env, timers });

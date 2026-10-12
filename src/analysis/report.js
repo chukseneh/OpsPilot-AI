@@ -108,6 +108,7 @@ export function buildReport(analysis, { analysisId, requestedBy, generatedAt = n
     activities: analysis.activities.map((a) => ({
       activity: a.activity, occurrences: a.occurrences, cases: a.cases,
       medianDuration: formatDuration(a.medianDurationMs), medianWaitBefore: formatDuration(a.medianWaitMs),
+      medianDurationMs: a.medianDurationMs, // the number behind medianDuration, for other checks (STORY-008 ROI)
     })),
     method: {
       thresholds: t,

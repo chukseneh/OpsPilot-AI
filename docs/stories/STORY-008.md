@@ -27,8 +27,8 @@ the same criteria out of `.colaberry/progress.json`, which Claude Code keeps in
 step (see the managed block in CLAUDE.md). Ticking something you have not
 actually met only misleads you.
 
-- [ ] Given user assumptions are provided, When ROI is calculated, Then it shows estimated savings.
-- [ ] Given user assumptions are incorrect, When ROI is calculated, Then it flags potential errors.
-- [ ] Trust: ROI calculations are logged with assumptions.
+- [x] Given user assumptions are provided, When ROI is calculated, Then it shows estimated savings.
+- [x] Given user assumptions are incorrect, When ROI is calculated, Then it flags potential errors.
+- [x] Trust: ROI calculations are logged with assumptions.
 
 When every box above is ticked, stop and show the demo.
