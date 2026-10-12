@@ -3,13 +3,13 @@
   "project": "OpsPilot AI — Enterprise AI Operations, Workflow & Risk Automation Platform",
   "totals": {
     "stories_total": 12,
-    "stories_verified": 9,
+    "stories_verified": 10,
     "stories_submitted": 0,
-    "stories_in_progress": 3,
+    "stories_in_progress": 2,
     "stories_not_started": 0,
     "criteria_total": 38,
-    "criteria_passed": 29,
-    "points_awarded": 1376
+    "criteria_passed": 32,
+    "points_awarded": 1443
   },
   "stories": [
     {
@@ -483,19 +483,15 @@
       "notes": "ROI estimates from user assumptions: time savings (cases x minutes x automation rate x cost per hour), other savings, one-off and yearly costs over a 1-10 year horizon; shows annual savings, net benefit, ROI % and payback with every formula, plus a low/expected/high range from stated uncertainty. Money is kept in whole minor units. Malformed input is refused with every problem listed; overflow, zero costs and never-paying-back are handled explicitly, and net benefit is cross-checked against year-by-year cash flows. Implausible assumptions and ones that disagree with linked evidence (STORY-002 analysis volumes/durations, STORY-007 contract or invoice figures, read with the user's own access) are flagged and the scenario marked needs_review; warnings never change the numbers. Financial analysts and operations managers only. Every calculation is logged with its full assumptions. Demo: node src/demo/roi.js (synthetic data).",
       "updated_at": "2026-10-12T00:00:00.000Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 80,
-        "outstanding": [
-          "Given user assumptions are provided, When ROI is calculated, Then it shows estimated savings.",
-          "Given user assumptions are incorrect, When ROI is calculated, Then it flags potential errors.",
-          "Trust: ROI calculations are logged with assumptions."
-        ]
+        "verified_at": "2026-10-12T02:46:17.176Z",
+        "commit_sha": "fdcc889fb2c0670106144a0122ddfb0c8f99e5a6",
+        "commit_url": "https://github.com/chukseneh/OpsPilot-AI/commit/fdcc889fb2c0670106144a0122ddfb0c8f99e5a6",
+        "commit_at": "2026-10-12T02:43:49Z",
+        "points_awarded": 147,
+        "outstanding": []
       }
     },
     {
