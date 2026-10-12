@@ -478,6 +478,7 @@
         "tests/roi-checks.test.mjs",
         "tests/roi-service.test.mjs",
         "tests/roi-demo.test.mjs",
+        "tests/roi-properties.test.mjs",
         "tests/system.test.mjs"
       ],
       "notes": "ROI estimates from user assumptions: time savings (cases x minutes x automation rate x cost per hour), other savings, one-off and yearly costs over a 1-10 year horizon; shows annual savings, net benefit, ROI % and payback with every formula, plus a low/expected/high range from stated uncertainty. Money is kept in whole minor units. Malformed input is refused with every problem listed; overflow, zero costs and never-paying-back are handled explicitly, and net benefit is cross-checked against year-by-year cash flows. Implausible assumptions and ones that disagree with linked evidence (STORY-002 analysis volumes/durations, STORY-007 contract or invoice figures, read with the user's own access) are flagged and the scenario marked needs_review; warnings never change the numbers. Financial analysts and operations managers only. Every calculation is logged with its full assumptions. Demo: node src/demo/roi.js (synthetic data).",
