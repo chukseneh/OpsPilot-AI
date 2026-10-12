@@ -1,5 +1,5 @@
 // STORY-008 demo: estimating ROI from user assumptions, checked against evidence,
-// on SYNTHETIC data (the STORY-002 sample invoice process and a generated contract).
+// on SYNTHETIC data (a made-up year of invoice processing and a generated contract).
 //
 //   node src/demo/roi.js
 //
@@ -22,9 +22,9 @@ import { createDocumentService, migrateDocuments } from '../documents/service.js
 import { createFileBlobStore } from '../documents/blobStore.js';
 import { createRoiService, migrateRoi, analysisLookupFrom, documentLookupFrom } from '../roi/service.js';
 import { formatMoney } from '../roi/calculate.js';
-import { sampleInvoiceProcess } from './sampleProcessData.js';
+import { sampleYearOfInvoices, YEAR_SAMPLE_LABEL } from './sampleYearOfInvoices.js';
 
-export const SAMPLE_LABEL = 'SYNTHETIC: the STORY-002 sample invoice process and a generated contract (invented for demonstration)';
+export const SAMPLE_LABEL = 'SYNTHETIC: a made-up year of invoice processing and a generated contract (invented for demonstration)';
 const ANALYST = { id: 'financial-analyst-1', role: 'financial analyst' };
 const OPS = { id: 'ops-manager-1', role: 'operations manager' };
 const PM = { id: 'process-manager-1', role: 'process manager' };
@@ -52,9 +52,13 @@ export async function runRoiDemo({ print = console.log } = {}) {
 
     rule('0. The evidence: a process analysis (STORY-002) and an uploaded contract (STORY-007)');
     const analyses = createMemoryResultStore();
-    const analysis = await createAnalysisService({ audit, store: analyses }).runAnalysis({ analysisId: 'AN-invoices', user: OPS, dataset: sampleInvoiceProcess() });
-    const enter = analysis.report.activities.find((a) => a.activity === 'Enter invoice into system');
-    print(`Analysis AN-invoices: "${enter.activity}" happened ${enter.occurrences} times between ${analysis.report.scope.period.from.slice(0, 10)} and ${analysis.report.scope.period.to.slice(0, 10)}, median ${enter.medianDuration}.`);
+    const analysis = await createAnalysisService({ audit, store: analyses }).runAnalysis({ analysisId: 'AN-invoices-year', user: OPS, dataset: sampleYearOfInvoices() });
+    const { from, to } = analysis.report.scope.period;
+    print(`Analysis AN-invoices-year (${YEAR_SAMPLE_LABEL}), ${from.slice(0, 10)} to ${to.slice(0, 10)}:`);
+    for (const name of ['Enter invoice into system', 'Check purchase order']) {
+      const act = analysis.report.activities.find((a) => a.activity === name);
+      print(`   "${name}": ${act.occurrences} times, median ${act.medianDuration}`);
+    }
     const documents = createDocumentService({ db, audit, blobs: createFileBlobStore({ dir: join(dir, 'files') }) });
     const contract = await documents.uploadDocument({ user: PM, fileName: 'ledgerly-licence.txt', bytes: new TextEncoder().encode(CONTRACT) });
     print(`Contract ${contract.id}: ${contract.status}; value ${contract.fields.contract_value.value} ${contract.fields.currency.value} over ${contract.fields.term.value.months} months.`);
@@ -63,9 +67,11 @@ export async function runRoiDemo({ print = console.log } = {}) {
     const licence = { label: 'Ledgerly licence', amount: 4800, evidence: { documentId: contract.id, field: 'contract_value' } };
     const base = {
       name: 'Automate invoice entry', currency: 'GBP', horizonYears: 3,
+      // Both time savings are linked to the year of observed processing, so their
+      // volume and minutes are checked against what actually happened.
       timeSavings: [
-        { label: 'Enter invoice into system', casesPerYear: 6000, minutesPerCase: 7, automationRate: 0.8, costPerHour: 32 },
-        { label: 'Check purchase order', casesPerYear: 6000, minutesPerCase: 16, automationRate: 0.3, costPerHour: 38 },
+        { label: 'Enter invoice into system', casesPerYear: 6000, minutesPerCase: 7, automationRate: 0.8, costPerHour: 32, evidence: { analysisId: 'AN-invoices-year', activity: 'Enter invoice into system' } },
+        { label: 'Check purchase order', casesPerYear: 6000, minutesPerCase: 16, automationRate: 0.3, costPerHour: 38, evidence: { analysisId: 'AN-invoices-year', activity: 'Check purchase order' } },
       ],
       otherSavings: [{ label: 'Fewer late-payment fees', amountPerYear: 1500 }],
       costs: { oneOff: [{ label: 'Implementation and training', amount: 18000 }], perYear: [licence] },
@@ -84,13 +90,13 @@ export async function runRoiDemo({ print = console.log } = {}) {
     row('Net benefit', (x) => m(x.netBenefit));
     row('ROI', (x) => (x.roiPercent === null ? 'n/a' : `${x.roiPercent}%`));
     row('Payback', (x) => (x.paybackMonths === null ? 'never' : `${x.paybackMonths} months`));
-    print(`\n   (${r.range}.)  Status: ${out.base.status}; the licence matches the contract.`);
+    print(`\n   (${r.range}.)  Status: ${out.base.status}; volumes and minutes match the year of observed processing, and the licence matches the contract.`);
 
     rule('2. Optimistic assumptions are flagged for review — against the evidence');
     out.optimistic = await roi.calculateRoiScenario({ user: ANALYST, scenarioId: 'ROI-invoice-entry-optimistic', assumptions: {
       ...base,
       name: 'Automate invoice entry (optimistic)',
-      timeSavings: [{ label: 'Enter invoice into system', casesPerYear: 20000, minutesPerCase: 25, automationRate: 0.98, costPerHour: 32, evidence: { analysisId: 'AN-invoices', activity: 'Enter invoice into system' } }],
+      timeSavings: [{ label: 'Enter invoice into system', casesPerYear: 20000, minutesPerCase: 25, automationRate: 0.98, costPerHour: 32, evidence: { analysisId: 'AN-invoices-year', activity: 'Enter invoice into system' } }],
       costs: { oneOff: base.costs.oneOff, perYear: [{ ...licence, amount: 1200 }] },
     } });
     print(`Status: ${out.optimistic.status}; expected net benefit ${formatMoney(out.optimistic.result.expected.netBenefit, 'GBP')} — shown, but with ${out.optimistic.warnings.length} warnings:`);

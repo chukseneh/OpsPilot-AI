@@ -8,8 +8,10 @@ import { runRoiDemo } from '../src/demo/roi.js';
 test('demo: savings shown, optimism flagged against evidence, errors refused, all logged with assumptions', async () => {
   const r = await runRoiDemo({ print: () => {} });
 
-  // Acceptance 1: estimated savings shown.
+  // Acceptance 1: estimated savings shown — and evidence that MATCHES raises no false alarm.
   assert.equal(r.base.status, 'ok');
+  assert.deepEqual(r.base.warnings, []);
+  assert.ok(r.base.assumptions.timeSavings.every((t) => t.evidence?.analysisId === 'AN-invoices-year'), 'the sensible estimate is linked to a year of observed processing');
   assert.equal(r.base.result.expected.annualSavings, 3766000);
   assert.ok(r.base.result.low.netBenefit < r.base.result.expected.netBenefit);
   assert.ok(r.base.result.savings.every((s) => s.formula));
@@ -18,6 +20,7 @@ test('demo: savings shown, optimism flagged against evidence, errors refused, al
   assert.equal(r.optimistic.status, 'needs_review');
   const codes = r.optimistic.warnings.map((w) => w.code);
   for (const c of ['automation_rate_high', 'volume_differs', 'duration_differs', 'amount_differs', 'roi_very_high']) assert.ok(codes.includes(c), c);
+  assert.ok(!codes.includes('evidence_period_short'), 'a year of evidence is long enough to scale');
 
   // Failure paths.
   assert.equal(r.inputError.name, 'RoiInputError');

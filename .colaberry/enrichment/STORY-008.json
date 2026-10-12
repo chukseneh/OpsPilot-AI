@@ -97,8 +97,8 @@
       "evidence": "src/roi/checks.js"
     },
     {
-      "statement": "The sample process analysis covers 30 synthetic cases over 25 days, so the demo's sensible estimate is not linked to it; evidence checks against a real volume need a real analysis.",
-      "evidence": "src/demo/roi.js"
+      "statement": "The evidence checks are proven against synthetic data only: the demo links its estimate to a made-up year of 6,000 invoices (where matching evidence raises no warnings and mismatching evidence does); checks against real volumes need a real analysis.",
+      "evidence": "src/demo/sampleYearOfInvoices.js"
     }
   ],
   "demonstrationEvidence": [

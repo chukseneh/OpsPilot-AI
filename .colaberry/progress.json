@@ -466,6 +466,7 @@
         "src/roi/checks.js",
         "src/roi/service.js",
         "src/demo/roi.js",
+        "src/demo/sampleYearOfInvoices.js",
         "src/system.js",
         "src/audit/decisions.js",
         "src/analysis/report.js",
