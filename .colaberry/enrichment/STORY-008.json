@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "1",
+  "projectId": "3704f65e-d372-4085-b821-5b5495f688d0",
+  "storyId": "STORY-008",
+  "projectTruthBaseRevision": 1,
+  "observedAt": "2026-10-12T00:00:00.000Z",
+  "sourceCommitSha": "fdcc889fb2c0670106144a0122ddfb0c8f99e5a6",
+  "factProposals": [
+    {
+      "dimension": "inputs",
+      "value": "An ROI estimate takes user assumptions: a name, a currency, a horizon of 1 to 10 years, time savings (cases per year, minutes per case, automation rate, cost per hour), other yearly savings, one-off and yearly costs, and optional uncertainty for savings and costs. Any assumption may link to evidence: a STORY-002 analysis step or a STORY-007 document field.",
+      "evidence": "src/roi/assumptions.js"
+    },
+    {
+      "dimension": "outputs",
+      "value": "Each estimate shows savings per item, annual savings, total costs, net benefit, ROI % and payback in months, each with its formula written out, for low, expected and high cases built from the stated uncertainty.",
+      "evidence": "src/roi/calculate.js"
+    },
+    {
+      "dimension": "data",
+      "value": "ROI scenarios are stored in PostgreSQL (roi_scenarios) with the assumptions exactly as submitted, the result, the warnings, status ok or needs_review, who calculated it and when.",
+      "evidence": "src/roi/service.js"
+    },
+    {
+      "dimension": "exceptions",
+      "value": "Malformed assumptions are refused with every problem listed; figures too large to hold exactly are refused as a calculation error; zero total costs give 'ROI cannot be calculated' and yearly costs above savings give 'never pays back', never a misleading number.",
+      "evidence": "tests/roi-calculate.test.mjs"
+    },
+    {
+      "dimension": "exceptions",
+      "value": "Assumptions that look wrong are flagged and the estimate marked needs_review: automation above 90%, hours saved above one full-time person per item, cost per hour outside 10-250, ROI above 1000%, payback under a month, no uncertainty, and any disagreement with linked evidence (volume or duration more than 50% from the analysis, a cost more than 5% from the document, a different currency, or evidence that is missing or unconfirmed).",
+      "evidence": "tests/roi-checks.test.mjs"
+    },
+    {
+      "dimension": "approval_points",
+      "value": "Only financial analysts and operations managers may calculate or view ROI estimates; documents used as evidence are read with the asking user's own access, so evidence they may not see counts as missing.",
+      "evidence": "tests/roi-service.test.mjs"
+    },
+    {
+      "dimension": "security_context",
+      "value": "Every ROI calculation, refusal and calculation failure is in the audit log with the full assumptions as submitted, the headline figures and every warning.",
+      "evidence": "tests/roi-service.test.mjs"
+    },
+    {
+      "dimension": "integrations",
+      "value": "ROI checks read saved STORY-002 process analyses (from their result store) and STORY-007 documents; the STORY-002 report now also records each activity's median duration as a number (medianDurationMs).",
+      "evidence": "src/analysis/report.js"
+    }
+  ],
+  "decisions": [
+    {
+      "statement": "Show core figures with a low/expected/high range from the user's stated uncertainty.",
+      "rationale": "Chosen by the student before building.",
+      "evidence": "src/roi/calculate.js"
+    },
+    {
+      "statement": "Detect incorrect assumptions with plausibility rules and by cross-checking linked evidence from process analyses and documents.",
+      "rationale": "Chosen by the student before building.",
+      "evidence": "src/roi/checks.js"
+    },
+    {
+      "statement": "Financial analysts and operations managers may calculate and view ROI.",
+      "rationale": "Chosen by the student before building.",
+      "evidence": "src/roi/service.js"
+    },
+    {
+      "statement": "Keep all money in whole minor units (pence, cents).",
+      "rationale": "Floating-point totals drift (0.1 + 0.2 is not 0.3); an ROI estimate must add up exactly.",
+      "evidence": "tests/roi-assumptions.test.mjs"
+    },
+    {
+      "statement": "Warnings sit beside the numbers and never change them.",
+      "rationale": "The estimate is the user's; the system's job is to show where it may be wrong, not to silently replace their judgement.",
+      "evidence": "tests/roi-checks.test.mjs"
+    },
+    {
+      "statement": "Do not refuse workloads larger than one person's year.",
+      "rationale": "A process is usually shared by a team; such volumes are flagged as a plausibility warning instead of refused.",
+      "evidence": "src/roi/assumptions.js"
+    }
+  ],
+  "limitations": [
+    {
+      "statement": "Only currencies with two decimal places, one currency per estimate, and no exchange rates.",
+      "evidence": "src/roi/assumptions.js"
+    },
+    {
+      "statement": "No discounting: money in later years is valued the same as money now (no NPV).",
+      "evidence": "src/roi/calculate.js"
+    },
+    {
+      "statement": "Plausibility thresholds are fixed defaults (configurable in code, not by users), and the cost-per-hour range does not vary by currency or country.",
+      "evidence": "src/roi/checks.js"
+    },
+    {
+      "statement": "Only assumptions explicitly linked to evidence are cross-checked; unlinked assumptions get plausibility checks only.",
+      "evidence": "src/roi/checks.js"
+    },
+    {
+      "statement": "The sample process analysis covers 30 synthetic cases over 25 days, so the demo's sensible estimate is not linked to it; evidence checks against a real volume need a real analysis.",
+      "evidence": "src/demo/roi.js"
+    }
+  ],
+  "demonstrationEvidence": [
+    { "kind": "test", "ref": "tests/roi-assumptions.test.mjs" },
+    { "kind": "test", "ref": "tests/roi-calculate.test.mjs" },
+    { "kind": "test", "ref": "tests/roi-checks.test.mjs" },
+    { "kind": "test", "ref": "tests/roi-service.test.mjs" },
+    { "kind": "test", "ref": "tests/roi-demo.test.mjs" },
+    { "kind": "demo", "ref": "src/demo/roi.js" },
+    { "kind": "commit", "ref": "fdcc889fb2c0670106144a0122ddfb0c8f99e5a6" }
+  ],
+  "measurementEvents": []
+}
