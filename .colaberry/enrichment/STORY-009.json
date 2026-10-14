@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "1",
+  "projectId": "3704f65e-d372-4085-b821-5b5495f688d0",
+  "storyId": "STORY-009",
+  "projectTruthBaseRevision": 1,
+  "observedAt": "2026-10-14T00:00:00.000Z",
+  "sourceCommitSha": "b8e03068e6fa72057f9d8bc8a2e802bf1ca7caf9",
+  "factProposals": [
+    {
+      "dimension": "data",
+      "value": "Governance is configured as versioned policy packs, one per jurisdiction (e.g. UK, EU, US-CA), stored in PostgreSQL (policy_versions): each version holds its controls, cited sources, review-by date, effective-from date, status (proposed, approved, rejected), alerts, the diff against the version it replaces, and who proposed and decided it.",
+      "evidence": "src/governance/service.js"
+    },
+    {
+      "dimension": "constraints",
+      "value": "A jurisdiction's policy controls which automated actions need human approval and the approval deadline and escalation time, which data categories and decision impacts count as high risk, who may read the audit log, and how long documents are kept. Policies can only add to the built-in rules, never remove them.",
+      "evidence": "tests/governance-applied.test.mjs"
+    },
+    {
+      "dimension": "constraints",
+      "value": "System floors no jurisdiction can lower: human approval of high-risk actions (REQ-007) and at least one year of audit-log retention (REQ-008). A policy that tries is refused as misconfigured.",
+      "evidence": "src/governance/policy.js"
+    },
+    {
+      "dimension": "approval_points",
+      "value": "Governance policy changes follow a two-person rule: a compliance officer proposes, and a different compliance or security officer approves or rejects with a note; the database itself refuses a self-approval.",
+      "evidence": "tests/governance-service.test.mjs"
+    },
+    {
+      "dimension": "human_only_decisions",
+      "value": "What a jurisdiction's regulations require is decided by people: a compliance officer authors each policy and cites its sources, counsel reviews it, and a second person approves it. The system checks a policy's form and consistency, never its legal correctness.",
+      "evidence": "src/governance/policy.js"
+    },
+    {
+      "dimension": "exceptions",
+      "value": "A misconfigured proposal is refused with every alert returned to the user; when the policy in force passes its review-by date the system alerts once that its rules may be out of date; if the policy cannot be refreshed, the last one keeps applying and the failure is logged.",
+      "evidence": "tests/governance-service.test.mjs"
+    },
+    {
+      "dimension": "security_context",
+      "value": "Every governance proposal, approval, rejection, refusal, review alert and switch of the policy in force is in the audit log with who, why and a diff of each changed setting.",
+      "evidence": "tests/governance-demo.test.mjs"
+    },
+    {
+      "dimension": "unknowns",
+      "value": "Acceptance criterion 1 says controls 'reflect local regulations'. The build meets it by mechanism (an approved jurisdiction policy demonstrably drives the controls), but the shipped UK and EU packs are illustrative, not legally reviewed. Whose legal review will turn them into real policy, and for which jurisdictions, is not yet known.",
+      "evidence": "src/governance/packs/eu.json"
+    }
+  ],
+  "decisions": [
+    {
+      "statement": "Ship jurisdiction rules as data packs authored and approved by people, with illustrative UK and EU examples marked 'not legal advice', rather than encoding regulations as authoritative.",
+      "rationale": "The build cannot guarantee legal accuracy; presenting example rules as law would look compliant without being checked. Chosen by the student before building.",
+      "evidence": "src/governance/packs/uk.json"
+    },
+    {
+      "statement": "Govern approvals, risk rules and record keeping.",
+      "rationale": "Chosen by the student before building; these are the parts of the system a jurisdiction's AI and data rules most directly touch.",
+      "evidence": "src/governance/policy.js"
+    },
+    {
+      "statement": "Two-person rule for configuration changes.",
+      "rationale": "Chosen by the student before building.",
+      "evidence": "src/governance/service.js"
+    },
+    {
+      "statement": "Every change is a new version with an effective date and a review-by date; old versions are never changed.",
+      "rationale": "Chosen by the student before building; it shows which rules applied when, and flags rules that may be out of date.",
+      "evidence": "src/governance/service.js"
+    },
+    {
+      "statement": "Services read the policy in force each time they need a control, through a view refreshed at start-up, after each approval and hourly.",
+      "rationale": "A dated update must take effect on its date without a restart.",
+      "evidence": "src/governance/view.js"
+    },
+    {
+      "statement": "The risk model's version names the policy it ran under (e.g. 1+EU.v1).",
+      "rationale": "A saved risk assessment must record which rules produced it.",
+      "evidence": "src/risk/riskModel.js"
+    }
+  ],
+  "limitations": [
+    {
+      "statement": "The shipped UK and EU packs are illustrative and have not been reviewed by counsel; they are not legal advice.",
+      "evidence": "src/governance/packs/eu.json"
+    },
+    {
+      "statement": "One jurisdiction applies per deployment (GOVERNANCE_JURISDICTION); a system operating across several jurisdictions at once is not supported.",
+      "evidence": "src/system.js"
+    },
+    {
+      "statement": "Document retention is reported (keep-until dates, a list of overdue documents), not enforced; nothing is deleted automatically.",
+      "evidence": "src/documents/service.js"
+    },
+    {
+      "statement": "Approval deadlines from a new policy apply to approval requests made after it takes effect; requests already waiting keep the deadline they were given.",
+      "evidence": "src/automation/workflows.js"
+    },
+    {
+      "statement": "Only approvals, risk rules and record keeping are governed; data residency and other controls are not.",
+      "evidence": "src/governance/policy.js"
+    }
+  ],
+  "demonstrationEvidence": [
+    { "kind": "test", "ref": "tests/governance-policy.test.mjs" },
+    { "kind": "test", "ref": "tests/governance-packs.test.mjs" },
+    { "kind": "test", "ref": "tests/governance-service.test.mjs" },
+    { "kind": "test", "ref": "tests/governance-applied.test.mjs" },
+    { "kind": "test", "ref": "tests/governance-demo.test.mjs" },
+    { "kind": "demo", "ref": "src/demo/governance.js" },
+    { "kind": "commit", "ref": "b8e03068e6fa72057f9d8bc8a2e802bf1ca7caf9" }
+  ],
+  "measurementEvents": []
+}
