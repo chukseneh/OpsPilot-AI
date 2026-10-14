@@ -5,7 +5,7 @@
 // ONE way to start the system, and it cannot start with them off:
 //
 //   const system = await startOpsPilot({ env: process.env });
-//   system.services.inventory / .risk / .workflows / .auditReader / .documents / .roi
+//   system.services.inventory / .risk / .workflows / .auditReader / .documents / .roi / .governance
 //   await system.stop();
 //
 // Settings (environment variables — never put them in a file in this repo):
@@ -15,6 +15,8 @@
 //   AUDIT_LOG_FILE    default data/audit.jsonl
 //   AUDIT_LOG_ID      default "main" (which anchors belong to this log)
 //   DOCUMENTS_DIR     where uploaded files are kept; default "documents" beside the audit log
+//   GOVERNANCE_JURISDICTION  optional, e.g. UK or EU: whose approved governance policy
+//                    applies (STORY-009). Unset: the built-in rules apply.
 //
 // Startup is refused — with the reason, and never the key — when a setting is
 // missing, when the log's storage is unhealthy (e.g. a half-written last line:
@@ -39,6 +41,9 @@ import { createDocumentService, migrateDocuments } from './documents/service.js'
 import { createFileBlobStore } from './documents/blobStore.js';
 import { createRoiService, migrateRoi, analysisLookupFrom, documentLookupFrom } from './roi/service.js';
 import { resolveThresholds } from './roi/checks.js';
+import { createPolicyAwareRiskModel } from './risk/riskModel.js';
+import { createGovernanceService, migrateGovernance } from './governance/service.js';
+import { createGovernanceView } from './governance/view.js';
 
 export class StartupRefusedError extends Error {
   constructor(message, options) { super(message, options); this.name = 'StartupRefusedError'; }
@@ -51,7 +56,9 @@ const SYSTEM = { type: 'system', id: 'opspilot' };
 // connector is supplied — the system never quietly uses a stand-in.
 // `roiThresholds` overrides the ROI plausibility thresholds (src/roi/checks.js),
 // e.g. { minCostPerHour: 15, maxCostPerHour: 120 } for this organisation.
-export async function startOpsPilot({ env = process.env, executors = {}, timers = {}, roiThresholds = {} } = {}) {
+// `now` replaces the clock used by the audit log and governance (dates a policy
+// takes effect, review dates) — for demos and tests that need to move time on.
+export async function startOpsPilot({ env = process.env, executors = {}, timers = {}, roiThresholds = {}, now } = {}) {
   // ---- 1. Settings ----
   if (!env.AUDIT_LOG_KEY) throw new StartupRefusedError('AUDIT_LOG_KEY is not set; OpsPilot will not start without the audit log signing key.');
   if (!env.DATABASE_URL && !env.PGLITE_DATA_DIR) {
@@ -61,6 +68,10 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
     resolveThresholds(roiThresholds); // checked before anything is opened
   } catch (err) {
     throw new StartupRefusedError(err.message, { cause: err });
+  }
+  const jurisdiction = env.GOVERNANCE_JURISDICTION || null;
+  if (jurisdiction && !/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/.test(jurisdiction)) {
+    throw new StartupRefusedError(`GOVERNANCE_JURISDICTION "${jurisdiction}" must look like UK, EU or US-CA.`);
   }
   const file = resolve(env.AUDIT_LOG_FILE ?? join('data', 'audit.jsonl'));
   const logId = env.AUDIT_LOG_ID ?? 'main';
@@ -75,7 +86,7 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
   // ---- 3. Open it with the key (refused for a wrong key or an unkeyed log) ----
   let audit;
   try {
-    audit = openAuditLogFromEnv({ file, env });
+    audit = openAuditLogFromEnv({ file, env, ...(now ? { now } : {}) });
   } catch (err) {
     throw new StartupRefusedError(`The audit log could not be opened: ${err.message}`, { cause: err });
   }
@@ -89,6 +100,7 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
     await migrateAnchors(db);
     await migrateDocuments(db);
     await migrateRoi(db);
+    await migrateGovernance(db);
   } catch (err) {
     await closeDb();
     throw err;
@@ -103,16 +115,33 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
   }
 
   // ---- 6. Services, all writing to the one keyed log ----
+  // The governance policy in force (STORY-009) is read by the services each time
+  // they need a control, through `view`; with no jurisdiction it is always null.
+  const governanceService = createGovernanceService({ db, audit, ...(now ? { now } : {}) });
+  const view = createGovernanceView({ governance: governanceService, jurisdiction, audit });
   const inventory = createInventoryService({ db, audit });
   const documents = createDocumentService({
-    db, audit, blobs: createFileBlobStore({ dir: resolve(env.DOCUMENTS_DIR ?? join(dirname(file), 'documents')) }),
+    db, audit, governance: view, blobs: createFileBlobStore({ dir: resolve(env.DOCUMENTS_DIR ?? join(dirname(file), 'documents')) }),
   });
   const services = {
     inventory,
     documents,
-    risk: createRiskAssessmentService({ audit, store: createFileResultStore({ file: join(dirname(file), 'risk-assessments.json') }) }),
-    workflows: createWorkflowEngine({ db, audit, executors: { 'inventory.update_status': createInventoryStatusExecutor({ inventory }), ...executors } }),
-    auditReader: createAuditReader({ audit, file, key: env.AUDIT_LOG_KEY, anchors }),
+    risk: createRiskAssessmentService({ audit, store: createFileResultStore({ file: join(dirname(file), 'risk-assessments.json') }), model: createPolicyAwareRiskModel(view) }),
+    workflows: createWorkflowEngine({ db, audit, governance: view, executors: { 'inventory.update_status': createInventoryStatusExecutor({ inventory }), ...executors } }),
+    // Who may read the audit log comes from the policy in force, checked on every read.
+    auditReader: {
+      readAuditLog: (args) => createAuditReader({
+        audit, file, key: env.AUDIT_LOG_KEY, anchors,
+        ...(view.current() ? { roles: view.current().controls.recordKeeping.auditReaderRoles } : {}),
+      }).readAuditLog(args),
+    },
+    // Approving or rejecting a version refreshes the policy in force straight away.
+    governance: {
+      ...governanceService,
+      approveProposal: async (args) => { const r = await governanceService.approveProposal(args); await view.refresh(); return r; },
+      rejectProposal: async (args) => { const r = await governanceService.rejectProposal(args); await view.refresh(); return r; },
+      inForce: () => view.current(),
+    },
     // ROI checks its assumptions against saved process analyses (the STORY-002 store
     // beside the log) and against documents, read with the asking user's access rights.
     roi: createRoiService({
@@ -125,7 +154,8 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
 
   // ---- 7. Record the start, anchor it, and start the timers ----
   try {
-    audit.append({ correlationId: 'system', actor: SYSTEM, action: 'system.started', detail: { database: db.kind, auditLog: { keyed: true, anchored: true, entries: integrity.count } } });
+    audit.append({ correlationId: 'system', actor: SYSTEM, action: 'system.started', detail: { database: db.kind, auditLog: { keyed: true, anchored: true, entries: integrity.count }, jurisdiction } });
+    await view.refresh();
     await anchors.anchor();
   } catch (err) {
     await closeDb();
@@ -133,6 +163,7 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
   }
   const approvalTimer = services.workflows.startApprovalTimer(timers.approvals ?? {});
   const anchorTimer = anchors.startTimer({ audit, ...(timers.anchors ?? {}) });
+  const governanceTimer = view.startTimer(timers.governance ?? {});
 
   let stopping = null;
   function stop() {
@@ -140,6 +171,7 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
     stopping ??= (async () => {
       await approvalTimer.stop();
       await anchorTimer.stop();
+      await governanceTimer.stop();
       try {
         audit.append({ correlationId: 'system', actor: SYSTEM, action: 'system.stopped' });
         await anchors.anchor(); // the final state is anchored, so nothing can be cut off after shutdown

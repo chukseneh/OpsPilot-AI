@@ -31,7 +31,11 @@ export const ACTION_TYPES = Object.freeze({
 const TAKES_OUT_OF_USE = new Set(['paused', 'retired']);
 const isNonEmpty = (v) => typeof v === 'string' && v.trim() !== '';
 
-export function classifyAction(action, { system, paymentLimit = DEFAULT_PAYMENT_LIMIT } = {}) {
+const PERSONAL = ['personal', 'sensitive_personal'];
+
+// `policy` is the governance policy in force (STORY-009), or none. A policy can
+// only ADD reasons for approval, never remove one.
+export function classifyAction(action, { system, paymentLimit = DEFAULT_PAYMENT_LIMIT, policy } = {}) {
   const reasons = [];
   const raise = (rule, why) => reasons.push({ rule, effect: 'high', why });
 
@@ -52,6 +56,11 @@ export function classifyAction(action, { system, paymentLimit = DEFAULT_PAYMENT_
     if (!system) raise('system.not_in_inventory', `AI system ${params.systemId} is not in the inventory, so its risk is unknown.`);
     else if (system.riskLevel === 'high') raise('system.high_risk', `It touches ${system.name}, which the inventory rates high risk.`);
     else if (system.riskLevel === 'unassessed') raise('system.unassessed', `It touches ${system.name}, which has not been risk-assessed yet.`);
+    // The jurisdiction's policy may require approval for anything touching personal data.
+    const personal = (system?.dataCategories ?? []).filter((c) => PERSONAL.includes(c));
+    if (policy?.controls?.approvals?.personalDataActionsNeedApproval && personal.length) {
+      raise('policy.personal_data', `Under the ${policy.jurisdiction.code} governance policy (version ${policy.version}), actions on AI systems that process personal data need human approval; ${system.name} processes ${personal.join(', ').replace(/_/g, ' ')} data.`);
+    }
   }
 
   // ---- 3. Rules for particular action types ----

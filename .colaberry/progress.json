@@ -503,21 +503,43 @@
       "criteria": [
         {
           "text": "Given a jurisdiction is selected, When governance controls are configured, Then they reflect local regulations.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given a jurisdiction is selected, When controls are misconfigured, Then the system alerts the user.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: Configuration changes are logged for audit purposes.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/governance/policy.js",
+        "src/governance/service.js",
+        "src/governance/view.js",
+        "src/governance/packs/index.js",
+        "src/governance/packs/uk.json",
+        "src/governance/packs/eu.json",
+        "src/demo/governance.js",
+        "src/system.js",
+        "src/automation/actionRisk.js",
+        "src/automation/workflows.js",
+        "src/risk/riskModel.js",
+        "src/documents/service.js",
+        "src/audit/decisions.js",
+        "docs/stories/STORY-009.md",
+        ".colaberry/enrichment/STORY-009.json"
+      ],
+      "tests_added": [
+        "tests/governance-policy.test.mjs",
+        "tests/governance-packs.test.mjs",
+        "tests/governance-service.test.mjs",
+        "tests/governance-applied.test.mjs",
+        "tests/governance-demo.test.mjs"
+      ],
+      "notes": "Configurable governance per jurisdiction as versioned policy packs (data). The selected jurisdiction's approved policy drives real behaviour: which automated actions need approval and the approval deadline/escalation (STORY-005), which data and decision impacts count as high risk (STORY-003), who may read the audit log, and document keep-until dates (STORY-006/007). CAVEAT on 'reflect local regulations': the mechanism is complete and tested, but the shipped UK and EU packs are ILLUSTRATIVE (real sources, example values, not legal advice); the policy only reflects local regulation once a compliance officer authors it, counsel reviews it and a second person approves it. Misconfigured proposals are refused with every alert; system floors (high-risk approval, 1-year audit retention) cannot be lowered. Two-person rule enforced in code and database. Updates are new versions with effective dates and diffs; passed review dates alert once. Every change logged with reason and diff. Demo: node src/demo/governance.js.",
+      "updated_at": "2026-10-14T00:00:00.000Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,

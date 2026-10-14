@@ -134,8 +134,16 @@ export function createWorkflowEngine({
   db, audit, executors = {}, agent = AUTOMATION_AGENT, startRoles = START_ROLES,
   paymentLimit = DEFAULT_PAYMENT_LIMIT, runOptions = {}, now = () => new Date(),
   escalateAfterMs = ESCALATE_AFTER_MS, deadlineMs = DEADLINE_MS,
+  // STORY-009: { current() } returning the governance policy in force, or null.
+  // When there is one, its approval deadline and escalation time are used for NEW
+  // approval requests, and it can require approval for personal-data actions.
+  governance = null,
 }) {
   const locks = new Map(); // workflowId → promise of the advance in progress
+  const policy = () => governance?.current() ?? null;
+  const HOUR_MS = 60 * 60 * 1000;
+  const deadlineFor = () => (policy() ? policy().controls.approvals.approvalDeadlineHours * HOUR_MS : deadlineMs);
+  const escalateFor = () => (policy() ? policy().controls.approvals.escalateAfterHours * HOUR_MS : escalateAfterMs);
 
   const logFor = (workflowId, actor) => (action, fields = {}) => audit.append({ correlationId: workflowId, actor, action, ...fields });
 
@@ -352,7 +360,7 @@ export function createWorkflowEngine({
           return true;
         });
         if (done) outcome.expired.push(id);
-      } else if (!row.escalatedAt && t >= Date.parse(row.approvalRequestedAt) + escalateAfterMs) {
+      } else if (!row.escalatedAt && t >= Date.parse(row.approvalRequestedAt) + escalateFor()) {
         const done = await change(log(row.runId), async (tx, logChange) => {
           const fresh = await lockedAction(tx, row.runId, row.step);
           if (fresh?.status !== 'awaiting_approval' || fresh.escalatedAt) return false;
@@ -518,7 +526,7 @@ export function createWorkflowEngine({
     // The database stores "not declared" as null; the classifier expects undefined.
     const { level, reasons } = classifyAction(
       { type: action.type, params, irreversible: action.irreversible, declaredRisk: action.declaredRisk ?? undefined },
-      { system, paymentLimit },
+      { system, paymentLimit, policy: policy() },
     );
     const at = now();
 
@@ -528,7 +536,7 @@ export function createWorkflowEngine({
         `UPDATE workflow_actions SET params = $3::jsonb, risk_level = $4, risk_reasons = $5::jsonb, status = $6,
            approval_requested_at = $7, deadline_at = $8 WHERE run_id = $1 AND step = $2`,
         [workflowId, action.step, JSON.stringify(params), level, JSON.stringify(reasons), high ? 'awaiting_approval' : 'pending',
-          high ? at.toISOString() : null, high ? new Date(at.getTime() + deadlineMs).toISOString() : null],
+          high ? at.toISOString() : null, high ? new Date(at.getTime() + deadlineFor()).toISOString() : null],
       );
       logChange('workflow.action_classified', {
         subject: `step ${action.step}`,

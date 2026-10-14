@@ -1,0 +1,33 @@
+{
+  "jurisdiction": { "code": "EU", "name": "European Union" },
+  "illustrative": true,
+  "notes": "ILLUSTRATIVE EXAMPLE - not legal advice. It shows how an EU policy pack is written for OpsPilot. The sources are real; the numbers are example choices. Have every control reviewed by qualified counsel, then set illustrative to false, before relying on it.",
+  "sources": [
+    { "id": "gdpr", "title": "Regulation (EU) 2016/679 (GDPR) - in particular Articles 5, 9 and 22", "url": "https://eur-lex.europa.eu/eli/reg/2016/679/oj" },
+    { "id": "ai-act", "title": "Regulation (EU) 2024/1689 (AI Act) - in particular human oversight and record-keeping for high-risk AI systems", "url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj" }
+  ],
+  "reviewBy": "2027-03-31",
+  "controls": {
+    "approvals": {
+      "highRiskActionsNeedApproval": true,
+      "personalDataActionsNeedApproval": true,
+      "approvalDeadlineHours": 48,
+      "escalateAfterHours": 8,
+      "source": "ai-act",
+      "note": "Supported by the sources: high-risk AI systems are to be designed for effective human oversight, and GDPR Article 22 gives people rights over solely automated significant decisions. Example choices: approval for any automated action on a personal-data system, a 48-hour deadline and escalation after 8 hours."
+    },
+    "riskRules": {
+      "highRiskDataCategories": ["personal", "sensitive_personal"],
+      "humanOversightRequiredFor": ["significant", "critical"],
+      "source": "ai-act",
+      "note": "Supported by the sources: the AI Act's risk-based approach, and GDPR's extra protection for special category data. Example choice: treating every AI system that processes personal data as high risk in this tool, which is stricter than the UK example on purpose; the AI Act's own high-risk categories are defined by use, not by data type."
+    },
+    "recordKeeping": {
+      "auditRetentionDays": 2555,
+      "documentRetentionDays": 2190,
+      "auditReaderRoles": ["security officer", "compliance officer"],
+      "source": "ai-act",
+      "note": "Supported by the sources: the AI Act requires logs for high-risk AI systems to be kept for a minimum period, and GDPR's storage limitation principle limits how long personal data is kept. Example choices: 7 years (2555 days) for the audit log and 6 years (2190 days) for documents; check the minimum log period in the AI Act's provisions for deployers."
+    }
+  }
+}

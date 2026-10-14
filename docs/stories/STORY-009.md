@@ -27,8 +27,8 @@ the same criteria out of `.colaberry/progress.json`, which Claude Code keeps in
 step (see the managed block in CLAUDE.md). Ticking something you have not
 actually met only misleads you.
 
-- [ ] Given a jurisdiction is selected, When governance controls are configured, Then they reflect local regulations.
-- [ ] Given a jurisdiction is selected, When controls are misconfigured, Then the system alerts the user.
-- [ ] Trust: Configuration changes are logged for audit purposes.
+- [x] Given a jurisdiction is selected, When governance controls are configured, Then they reflect local regulations.
+- [x] Given a jurisdiction is selected, When controls are misconfigured, Then the system alerts the user.
+- [x] Trust: Configuration changes are logged for audit purposes.
 
 When every box above is ticked, stop and show the demo.

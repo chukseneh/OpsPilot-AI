@@ -94,7 +94,17 @@ const outcomeRationale = (result) => (result.status === 'extracted'
   ? `Extracted ${Object.keys(result.fields).length} field(s) from a${result.kind === 'invoice' ? 'n' : ''} ${result.kind}; every required field present and every check passed.`
   : `Flagged for review: ${result.flags.map((f) => (f.field ? `${f.field} ${f.problem}` : f.problem)).join('; ')}`);
 
-export function createDocumentService({ db, audit, blobs, readOptions = {} }) {
+// `governance` (STORY-009): { current() } returning the governance policy in force,
+// or null. With one, each document read shows `keepUntil` (uploaded + the policy's
+// documentRetentionDays) and listDueForDeletion() reports documents past it.
+// Nothing is deleted automatically: deleting records is a decision for a person.
+export function createDocumentService({ db, audit, blobs, readOptions = {}, governance = null, now = () => new Date() }) {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const retentionDays = () => governance?.current()?.controls?.recordKeeping?.documentRetentionDays ?? null;
+  const withRetention = (doc) => {
+    const days = retentionDays();
+    return { ...doc, keepUntil: days ? new Date(Date.parse(doc.uploadedAt) + days * DAY_MS).toISOString() : null };
+  };
   const UNKNOWN = { type: 'system', id: 'unknown-requester' };
 
   function authorise(user, allowed, correlationId, what, subject = null) {
@@ -216,7 +226,7 @@ export function createDocumentService({ db, audit, blobs, readOptions = {} }) {
       throw new DocumentNotFoundError(`No document ${id} that you may see.`);
     }
     log('document.viewed');
-    return fromRow(r);
+    return withRetention(fromRow(r));
   }
 
   async function listDocuments({ user, status } = {}) {
@@ -228,7 +238,7 @@ export function createDocumentService({ db, audit, blobs, readOptions = {} }) {
       [all, user.id, status ?? null],
     );
     audit.append({ correlationId: 'documents', actor, action: 'document.listed', detail: { scope: all ? 'all' : 'own', status: status ?? null, returned: rows.length } });
-    return rows.map(fromRow);
+    return rows.map((r) => withRetention(fromRow(r)));
   }
 
   // ---------------------------------------------------------------------------
@@ -317,7 +327,22 @@ export function createDocumentService({ db, audit, blobs, readOptions = {} }) {
     return outcome;
   }
 
-  return { uploadDocument, getDocument, listDocuments, reviewDocument };
+  // Documents kept longer than the policy in force allows. Reviewers only; the
+  // list is logged. It reports — it does not delete.
+  async function listDueForDeletion({ user } = {}) {
+    const actor = authorise(user, REVIEWER_ROLES, 'documents:retention', 'review document retention');
+    const days = retentionDays();
+    const due = days === null ? [] : (await db.query('SELECT * FROM documents ORDER BY uploaded_at, id')).rows
+      .map((r) => withRetention(fromRow(r)))
+      .filter((d) => Date.parse(d.keepUntil) < now().getTime());
+    audit.append({
+      correlationId: 'documents:retention', actor, action: 'document.retention_checked',
+      detail: { retentionDays: days, due: due.map((d) => d.id), policy: governance?.current() ? `${governance.current().jurisdiction.code} v${governance.current().version}` : null },
+    });
+    return due;
+  }
+
+  return { uploadDocument, getDocument, listDocuments, reviewDocument, listDueForDeletion };
 }
 
 // Fields a reviewer may set, per kind: the required ones (from extract.js, so the

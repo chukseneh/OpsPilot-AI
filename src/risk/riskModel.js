@@ -105,6 +105,52 @@ const bySeverityThenCategory = (a, b) => SEVERITIES.indexOf(b.severity) - SEVERI
   || RISK_CATEGORIES.indexOf(a.category) - RISK_CATEGORIES.indexOf(b.category)
   || a.rule.localeCompare(b.rule);
 
+// ---------------------------------------------------------------------------
+// Rules a jurisdiction's governance policy ADDS (STORY-009). They only ever raise
+// a risk the built-in rules would not already rate high; they never remove one.
+const BUILT_IN_HIGH_DATA = ['sensitive_personal'];
+
+export function policyRules(policy) {
+  if (!policy) return [];
+  const where = `the ${policy.jurisdiction.code} governance policy (version ${policy.version})`;
+  const { highRiskDataCategories = [], humanOversightRequiredFor = [] } = policy.controls.riskRules;
+  const extraData = highRiskDataCategories.filter((c) => !BUILT_IN_HIGH_DATA.includes(c));
+  const extraImpacts = humanOversightRequiredFor.filter((i) => !atLeast(i, 'significant'));
+  return [
+    {
+      rule: 'jurisdiction.high_risk_data',
+      category: 'privacy',
+      severity: (s) => (s.dataCategories.some((c) => extraData.includes(c)) ? 'high' : null),
+      why: (s) => `Under ${where}, AI systems processing ${s.dataCategories.filter((c) => extraData.includes(c)).join(', ').replace(/_/g, ' ')} data are high risk.`,
+      mitigations: ['Apply the controls this jurisdiction requires for such systems, and record the review.'],
+    },
+    {
+      rule: 'jurisdiction.oversight_required',
+      category: 'human_oversight',
+      severity: (s) => (extraImpacts.includes(s.decisionImpact) && s.humanOversight === 'none' ? 'high' : null),
+      why: (s) => `Under ${where}, decisions with ${s.decisionImpact} impact need human oversight, and this system has none.`,
+      mitigations: ['Put a person in the loop before its outputs take effect.'],
+    },
+  ];
+}
+
+// A risk model that applies whatever governance policy is in force at the moment
+// it is used. Its version names that policy (e.g. "1+UK.v2"), so a saved
+// assessment records which rules it ran under — and re-running the same request
+// under a different policy is a different calculation, not a replay.
+export function createPolicyAwareRiskModel(governance) {
+  return {
+    id: 'rule-based',
+    get version() {
+      const p = governance?.current();
+      return p ? `1+${p.jurisdiction.code}.v${p.version}` : '1';
+    },
+    assess(system, options) {
+      return createRuleBasedRiskModel({ rules: [...RULES, ...policyRules(governance?.current())] }).assess(system, options);
+    },
+  };
+}
+
 export function createRuleBasedRiskModel({ rules = RULES } = {}) {
   return {
     id: 'rule-based',

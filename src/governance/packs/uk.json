@@ -1,0 +1,35 @@
+{
+  "jurisdiction": { "code": "UK", "name": "United Kingdom" },
+  "illustrative": true,
+  "notes": "ILLUSTRATIVE EXAMPLE - not legal advice. It shows how a UK policy pack is written for OpsPilot. The sources are real; the numbers are example choices. Have every control reviewed by qualified counsel, then set illustrative to false, before relying on it.",
+  "sources": [
+    { "id": "uk-gdpr-a5", "title": "UK GDPR Article 5 - principles, including storage limitation (5(1)(e)) and accountability (5(2))", "url": "https://www.legislation.gov.uk/eur/2016/679/article/5" },
+    { "id": "uk-gdpr-a9", "title": "UK GDPR Article 9 - special category personal data", "url": "https://www.legislation.gov.uk/eur/2016/679/article/9" },
+    { "id": "uk-gdpr-a22", "title": "UK GDPR Article 22 - automated individual decision-making", "url": "https://www.legislation.gov.uk/eur/2016/679/article/22" },
+    { "id": "ico-ai", "title": "ICO - Guidance on AI and data protection" }
+  ],
+  "reviewBy": "2027-03-31",
+  "controls": {
+    "approvals": {
+      "highRiskActionsNeedApproval": true,
+      "personalDataActionsNeedApproval": true,
+      "approvalDeadlineHours": 24,
+      "escalateAfterHours": 4,
+      "source": "uk-gdpr-a22",
+      "note": "Supported by the source: people should be able to obtain human review of significant decisions made solely by automated means. Example choices: requiring approval for any automated action touching a system that processes personal data, and the 24-hour deadline with escalation after 4 hours."
+    },
+    "riskRules": {
+      "highRiskDataCategories": ["sensitive_personal"],
+      "humanOversightRequiredFor": ["significant", "critical"],
+      "source": "uk-gdpr-a9",
+      "note": "Supported by the source: special category data needs extra protection. Example choice: treating any AI system that uses it as high risk, and requiring human oversight wherever decisions have significant or critical impact (see also Article 22)."
+    },
+    "recordKeeping": {
+      "auditRetentionDays": 2190,
+      "documentRetentionDays": 2190,
+      "auditReaderRoles": ["security officer", "compliance officer"],
+      "source": "uk-gdpr-a5",
+      "note": "Supported by the source: keep personal data no longer than necessary, and be able to demonstrate compliance. Example choice: 6 years (2190 days) for both, a common business-records period; the law does not set this figure."
+    }
+  }
+}
