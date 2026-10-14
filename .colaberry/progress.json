@@ -537,7 +537,8 @@
         "tests/governance-service.test.mjs",
         "tests/governance-applied.test.mjs",
         "tests/governance-demo.test.mjs",
-        "tests/governance-wire.test.mjs"
+        "tests/governance-wire.test.mjs",
+        "tests/governance-properties.test.mjs"
       ],
       "notes": "Configurable governance per jurisdiction as versioned policy packs (data). The selected jurisdiction's approved policy drives real behaviour: which automated actions need approval and the approval deadline/escalation (STORY-005), which data and decision impacts count as high risk (STORY-003), who may read the audit log, and document keep-until dates (STORY-006/007). CAVEAT on 'reflect local regulations': the mechanism is complete and tested, but the shipped UK and EU packs are ILLUSTRATIVE (real sources, example values, not legal advice); the policy only reflects local regulation once a compliance officer authors it, counsel reviews it and a second person approves it. Misconfigured proposals are refused with every alert; system floors (high-risk approval, 1-year audit retention) cannot be lowered. Two-person rule enforced in code and database. Updates are new versions with effective dates and diffs; passed review dates alert once. Every change logged with reason and diff. Demo: node src/demo/governance.js.",
       "updated_at": "2026-10-14T00:00:00.000Z",
