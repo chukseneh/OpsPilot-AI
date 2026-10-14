@@ -3,13 +3,13 @@
   "project": "OpsPilot AI — Enterprise AI Operations, Workflow & Risk Automation Platform",
   "totals": {
     "stories_total": 12,
-    "stories_verified": 10,
+    "stories_verified": 11,
     "stories_submitted": 0,
-    "stories_in_progress": 2,
+    "stories_in_progress": 1,
     "stories_not_started": 0,
     "criteria_total": 38,
-    "criteria_passed": 32,
-    "points_awarded": 1443
+    "criteria_passed": 35,
+    "points_awarded": 1510
   },
   "stories": [
     {
@@ -541,19 +541,15 @@
       "notes": "Configurable governance per jurisdiction as versioned policy packs (data). The selected jurisdiction's approved policy drives real behaviour: which automated actions need approval and the approval deadline/escalation (STORY-005), which data and decision impacts count as high risk (STORY-003), who may read the audit log, and document keep-until dates (STORY-006/007). CAVEAT on 'reflect local regulations': the mechanism is complete and tested, but the shipped UK and EU packs are ILLUSTRATIVE (real sources, example values, not legal advice); the policy only reflects local regulation once a compliance officer authors it, counsel reviews it and a second person approves it. Misconfigured proposals are refused with every alert; system floors (high-risk approval, 1-year audit retention) cannot be lowered. Two-person rule enforced in code and database. Updates are new versions with effective dates and diffs; passed review dates alert once. Every change logged with reason and diff. Demo: node src/demo/governance.js.",
       "updated_at": "2026-10-14T00:00:00.000Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 80,
-        "outstanding": [
-          "Given a jurisdiction is selected, When governance controls are configured, Then they reflect local regulations.",
-          "Given a jurisdiction is selected, When controls are misconfigured, Then the system alerts the user.",
-          "Trust: Configuration changes are logged for audit purposes."
-        ]
+        "verified_at": "2026-10-14T03:01:00.467Z",
+        "commit_sha": "b8e03068e6fa72057f9d8bc8a2e802bf1ca7caf9",
+        "commit_url": "https://github.com/chukseneh/OpsPilot-AI/commit/b8e03068e6fa72057f9d8bc8a2e802bf1ca7caf9",
+        "commit_at": "2026-10-14T02:57:51Z",
+        "points_awarded": 147,
+        "outstanding": []
       }
     },
     {
