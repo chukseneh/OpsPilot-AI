@@ -69,14 +69,23 @@ CREATE TABLE IF NOT EXISTS policy_versions (
 `;
 export async function migrateGovernance(db) { await db.exec(GOVERNANCE_SCHEMA_SQL); }
 
+// Every read of a version also returns its effective date AS TEXT ('YYYY-MM-DD').
+// The pg driver turns a DATE into a JavaScript Date at LOCAL midnight; converting
+// that back with toISOString() gives the day before on a server east of UTC
+// (Paris, Tokyo…). Text from the database involves no timezone at all.
+const ROW = "*, to_char(effective_from, 'YYYY-MM-DD') AS effective_date";
+
 const isNonEmpty = (v) => typeof v === 'string' && v.trim() !== '';
 const iso = (v) => (v == null ? null : new Date(v).toISOString());
+// Today's date for a moment in time. Policy dates are UTC calendar days: a policy
+// effective 2026-12-01 applies from 00:00 UTC that day. (Dates READ from the
+// database never come through here — see ROW.)
 const dateOnly = (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
 const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00Z`));
 
 const fromRow = (r) => ({
   jurisdiction: r.jurisdiction, version: r.version, status: r.status, policy: r.policy, alerts: r.alerts, diff: r.diff,
-  effectiveFrom: dateOnly(r.effective_from), reason: r.reason, proposedBy: r.proposed_by, proposedAt: iso(r.proposed_at),
+  effectiveFrom: r.effective_date, reason: r.reason, proposedBy: r.proposed_by, proposedAt: iso(r.proposed_at),
   decidedBy: r.decided_by, decidedAt: iso(r.decided_at), decisionNote: r.decision_note,
 });
 
@@ -136,7 +145,7 @@ export function createGovernanceService({ db, audit, now = () => new Date() }) {
 
   async function activeRow(q, jurisdiction, at = today()) {
     const { rows: [r] } = await q.query(
-      `SELECT * FROM policy_versions WHERE jurisdiction = $1 AND status = 'approved' AND effective_from <= $2::date
+      `SELECT ${ROW} FROM policy_versions WHERE jurisdiction = $1 AND status = 'approved' AND effective_from <= $2::date
        ORDER BY effective_from DESC, version DESC LIMIT 1`,
       [jurisdiction, at],
     );
@@ -173,7 +182,7 @@ export function createGovernanceService({ db, audit, now = () => new Date() }) {
     const attempt = () => change(correlationId, actor, async (tx, logChange) => {
       // The same proposal still waiting? Return it rather than making a second version.
       const { rows: [pending] } = await tx.query(
-        "SELECT * FROM policy_versions WHERE jurisdiction = $1 AND status = 'proposed' AND fingerprint = $2", [code, fp]);
+        `SELECT ${ROW} FROM policy_versions WHERE jurisdiction = $1 AND status = 'proposed' AND fingerprint = $2`, [code, fp]);
       if (pending) {
         log(correlationId, actor, 'governance.proposal_unchanged', { subject: `${code} v${pending.version}`, rationale: 'This exact proposal is already waiting for approval.' });
         return fromRow(pending);
@@ -183,7 +192,7 @@ export function createGovernanceService({ db, audit, now = () => new Date() }) {
       const { rows: [{ next }] } = await tx.query('SELECT COALESCE(max(version), 0) + 1 AS next FROM policy_versions WHERE jurisdiction = $1', [code]);
       const { rows: [row] } = await tx.query(
         `INSERT INTO policy_versions (jurisdiction, version, status, policy, alerts, diff, effective_from, reason, proposed_by, fingerprint)
-         VALUES ($1, $2, 'proposed', $3::jsonb, $4::jsonb, $5::jsonb, $6::date, $7, $8, $9) RETURNING *`,
+         VALUES ($1, $2, 'proposed', $3::jsonb, $4::jsonb, $5::jsonb, $6::date, $7, $8, $9) RETURNING ${ROW}`,
         [code, next, JSON.stringify(policy), JSON.stringify(check.alerts), JSON.stringify(diff), from, reason.trim(), user.id, fp],
       );
       logChange('governance.proposed', {
@@ -211,7 +220,7 @@ export function createGovernanceService({ db, audit, now = () => new Date() }) {
     if (!isNonEmpty(note)) throw refuse(`a note is required: say why you ${decision} it`);
 
     return change(correlationId, actor, async (tx, logChange) => {
-      const { rows: [row] } = await tx.query('SELECT * FROM policy_versions WHERE jurisdiction = $1 AND version = $2 FOR UPDATE', [jurisdiction, version]);
+      const { rows: [row] } = await tx.query(`SELECT ${ROW} FROM policy_versions WHERE jurisdiction = $1 AND version = $2 FOR UPDATE`, [jurisdiction, version]);
       if (!row) throw refuse(`there is no version ${version} for ${jurisdiction}`);
       const done = { approve: 'approved', reject: 'rejected' }[decision];
       if (row.status === done && row.decided_by === user.id) {
@@ -229,13 +238,13 @@ export function createGovernanceService({ db, audit, now = () => new Date() }) {
       }
       const { rows: [updated] } = await tx.query(
         `UPDATE policy_versions SET status = $3, decided_by = $4, decided_at = now(), decision_note = $5, alerts = $6::jsonb
-         WHERE jurisdiction = $1 AND version = $2 RETURNING *`,
+         WHERE jurisdiction = $1 AND version = $2 RETURNING ${ROW}`,
         [jurisdiction, version, done, user.id, note.trim(), JSON.stringify(alerts)],
       );
       logChange(`governance.${done}`, {
         subject: `${jurisdiction} v${version}`,
         rationale: note.trim(),
-        detail: { proposedBy: row.proposed_by, effectiveFrom: dateOnly(row.effective_from), diff: row.diff, warnings: alerts },
+        detail: { proposedBy: row.proposed_by, effectiveFrom: row.effective_date, diff: row.diff, warnings: alerts },
       });
       return fromRow(updated);
     });
@@ -253,7 +262,7 @@ export function createGovernanceService({ db, audit, now = () => new Date() }) {
 
   async function listVersions({ user, jurisdiction } = {}) {
     const actor = authorise(user, APPROVER_ROLES, `governance:${jurisdiction}`, 'view governance policies');
-    const { rows } = await db.query('SELECT * FROM policy_versions WHERE jurisdiction = $1 ORDER BY version DESC', [jurisdiction]);
+    const { rows } = await db.query(`SELECT ${ROW} FROM policy_versions WHERE jurisdiction = $1 ORDER BY version DESC`, [jurisdiction]);
     log(`governance:${jurisdiction}`, actor, 'governance.viewed', { detail: { versions: rows.length } });
     return rows.map(fromRow);
   }
