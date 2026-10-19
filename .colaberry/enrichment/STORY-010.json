@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "1",
+  "projectId": "3704f65e-d372-4085-b821-5b5495f688d0",
+  "storyId": "STORY-010",
+  "projectTruthBaseRevision": 1,
+  "observedAt": "2026-10-20T00:00:00.000Z",
+  "sourceCommitSha": "2346f215ccd060a26d28bb4d88b34443129712ee",
+  "factProposals": [
+    {
+      "dimension": "inputs",
+      "value": "A simulation takes a scenario: synthetic AI systems with given risk ratings, STORY-005 workflows, optional scripted approve/reject decisions, an optional STORY-009 policy, and the expected risk level and outcome of every step plus each workflow's final status. Scenarios can also be generated from a seed.",
+      "evidence": "src/simulation/scenario.js"
+    },
+    {
+      "dimension": "outputs",
+      "value": "Each simulation produces a saved report: a verdict (passed, failed, timed_out or error), counts of workflows and steps matched, every mismatch with what was expected and what happened (a step that should have needed a person but ran without one is graded critical), each workflow's actual steps, and the sandbox's own audit log.",
+      "evidence": "src/simulation/compare.js"
+    },
+    {
+      "dimension": "data",
+      "value": "Simulation data must be clearly marked synthetic: the scenario says synthetic: true and its label says SYNTHETIC, every system and workflow id starts with SYN-, and every system name contains (SYNTHETIC). Reports are stored in PostgreSQL (simulation_runs), which itself refuses a non-synthetic scenario.",
+      "evidence": "tests/simulation-scenario.test.mjs"
+    },
+    {
+      "dimension": "constraints",
+      "value": "Every simulation runs in an isolated sandbox with its own in-memory database, inventory, audit log and stand-in executors, and is removed afterwards; simulations never reach the live database, inventory or connectors.",
+      "evidence": "tests/simulation-service.test.mjs"
+    },
+    {
+      "dimension": "exceptions",
+      "value": "Incorrect synthetic data (unmarked, invalid systems, actions naming unknown systems, uncheckable expectations) and generator output that fails the same checks are refused before anything runs; a run past its time limit is stopped and reported timed_out with unfinished workflows unchecked; workflows that do not behave as expected are reported as mismatches.",
+      "evidence": "tests/simulation-sandbox.test.mjs"
+    },
+    {
+      "dimension": "approval_points",
+      "value": "Only system testers and process managers may run or view simulations; inside the sandbox, scripted approvals are made by a different synthetic person from the one who started the workflow.",
+      "evidence": "src/simulation/sandbox.js"
+    },
+    {
+      "dimension": "actors",
+      "value": "The system tester role, from this story's narrative, runs simulations.",
+      "evidence": "src/simulation/service.js"
+    },
+    {
+      "dimension": "security_context",
+      "value": "Every simulation run and refusal is in the keyed main audit log: started, and completed as a decision whose rationale states the verdict and every critical mismatch; each entry records that the data was synthetic.",
+      "evidence": "tests/simulation-demo.test.mjs"
+    }
+  ],
+  "decisions": [
+    {
+      "statement": "Run every simulation in a fully isolated sandbox rather than inside the running system.",
+      "rationale": "A simulation must never be able to touch real systems or records. Chosen by the student before building.",
+      "evidence": "src/simulation/sandbox.js"
+    },
+    {
+      "statement": "Judge 'executes as expected' against declared expectations for every step and final status, not merely 'completed without errors'.",
+      "rationale": "Only declared expectations catch a high-risk step wrongly running unattended. Chosen by the student before building.",
+      "evidence": "src/simulation/compare.js"
+    },
+    {
+      "statement": "System testers and process managers may run simulations.",
+      "rationale": "Chosen by the student before building.",
+      "evidence": "src/simulation/service.js"
+    },
+    {
+      "statement": "The generator derives expected outcomes from its own small recipe table, not from the system's risk classifier.",
+      "rationale": "Expectations computed by the code under test would make every simulation agree with itself.",
+      "evidence": "src/simulation/scenario.js"
+    },
+    {
+      "statement": "Grade as critical only the dangerous direction: a step expected to need a person that ran without one. A step held for approval when it was expected to run is a normal mismatch.",
+      "rationale": "REQ-007 forbids unattended high-risk actions; the system being stricter than expected is a test to fix, not a safety failure.",
+      "evidence": "tests/simulation-demo.test.mjs"
+    },
+    {
+      "statement": "The time limit covers running the workflows (from the end of sandbox setup) and is checked between every step, with a timer only as a backstop.",
+      "rationale": "PGlite's work can run without letting a timer fire, so a timer alone never stopped a busy run; setup time is not part of the simulated work.",
+      "evidence": "src/simulation/sandbox.js"
+    }
+  ],
+  "limitations": [
+    {
+      "statement": "The generator uses four action recipes (low-risk notify and ticket, payment, notify about a high-risk system); other behaviour needs hand-written scenarios.",
+      "evidence": "src/simulation/scenario.js"
+    },
+    {
+      "statement": "Notify, ticket and payment actions use stand-in executors in the sandbox, so connector behaviour is not simulated.",
+      "evidence": "src/simulation/sandbox.js"
+    },
+    {
+      "statement": "The time limit is checked between steps; a single long step can overrun it until that step's own executor time limit ends it.",
+      "evidence": "src/simulation/sandbox.js"
+    },
+    {
+      "statement": "Sandboxes are in memory, which bounds scenario size (at most 500 systems, 200 workflows and 20 actions per workflow).",
+      "evidence": "src/simulation/scenario.js"
+    },
+    {
+      "statement": "Risk ratings are given by the scenario rather than produced by a STORY-003 assessment inside the sandbox.",
+      "evidence": "src/simulation/sandbox.js"
+    }
+  ],
+  "demonstrationEvidence": [
+    { "kind": "test", "ref": "tests/simulation-scenario.test.mjs" },
+    { "kind": "test", "ref": "tests/simulation-sandbox.test.mjs" },
+    { "kind": "test", "ref": "tests/simulation-compare.test.mjs" },
+    { "kind": "test", "ref": "tests/simulation-service.test.mjs" },
+    { "kind": "test", "ref": "tests/simulation-demo.test.mjs" },
+    { "kind": "demo", "ref": "src/demo/simulation.js" },
+    { "kind": "commit", "ref": "2346f215ccd060a26d28bb4d88b34443129712ee" }
+  ],
+  "measurementEvents": []
+}
