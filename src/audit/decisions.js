@@ -37,6 +37,8 @@ export const DECISION_ACTIONS = Object.freeze(new Set([
   // Governance controls (STORY-009)
   'governance.denied', 'governance.proposal_refused', 'governance.decision_refused',
   'governance.approved', 'governance.rejected', 'governance.review_overdue',
+  // Simulations (STORY-010)
+  'simulation.denied', 'simulation.rejected', 'simulation.completed',
 ]));
 
 export const isDecision = (action) => DECISION_ACTIONS.has(action);

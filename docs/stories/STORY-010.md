@@ -27,8 +27,8 @@ the same criteria out of `.colaberry/progress.json`, which Claude Code keeps in
 step (see the managed block in CLAUDE.md). Ticking something you have not
 actually met only misleads you.
 
-- [ ] Given synthetic data is available, When a workflow is simulated, Then it executes as expected.
-- [ ] Given synthetic data is incorrect, When a workflow is simulated, Then it flags errors.
-- [ ] Trust: Simulation results are logged for review.
+- [x] Given synthetic data is available, When a workflow is simulated, Then it executes as expected.
+- [x] Given synthetic data is incorrect, When a workflow is simulated, Then it flags errors.
+- [x] Trust: Simulation results are logged for review.
 
 When every box above is ticked, stop and show the demo.

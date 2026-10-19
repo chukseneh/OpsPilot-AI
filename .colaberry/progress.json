@@ -562,21 +562,37 @@
       "criteria": [
         {
           "text": "Given synthetic data is available, When a workflow is simulated, Then it executes as expected.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given synthetic data is incorrect, When a workflow is simulated, Then it flags errors.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: Simulation results are logged for review.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/simulation/scenario.js",
+        "src/simulation/sandbox.js",
+        "src/simulation/compare.js",
+        "src/simulation/service.js",
+        "src/demo/simulation.js",
+        "src/system.js",
+        "src/audit/decisions.js",
+        "docs/stories/STORY-010.md",
+        ".colaberry/enrichment/STORY-010.json"
+      ],
+      "tests_added": [
+        "tests/simulation-scenario.test.mjs",
+        "tests/simulation-sandbox.test.mjs",
+        "tests/simulation-compare.test.mjs",
+        "tests/simulation-service.test.mjs",
+        "tests/simulation-demo.test.mjs"
+      ],
+      "notes": "Workflow simulation on synthetic data: a scenario declares synthetic AI systems, STORY-005 workflows, scripted approvals and the expected risk level and outcome of every step. Data not clearly marked synthetic (synthetic flag, SYN- ids, (SYNTHETIC) names) or otherwise invalid is refused with every problem listed, and nothing runs; a seeded generator makes larger scenarios with expectations from its own independent rules, and its output is checked the same way. Each run uses an isolated sandbox (its own in-memory database, inventory, audit log and stand-in executors) with the real workflow engine and optional STORY-009 policy, under a time limit, and is always torn down. Results are compared step by step: passed, failed (mismatches described; a step that should have needed a person but ran without one is CRITICAL), timed_out or error. Reports (with the sandbox's own log) are saved; every run is in the keyed main audit log with a plain-words rationale. System testers and process managers only. Demo: node src/demo/simulation.js.",
+      "updated_at": "2026-10-20T00:00:00.000Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,

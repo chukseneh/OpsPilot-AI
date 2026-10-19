@@ -5,7 +5,7 @@
 // ONE way to start the system, and it cannot start with them off:
 //
 //   const system = await startOpsPilot({ env: process.env });
-//   system.services.inventory / .risk / .workflows / .auditReader / .documents / .roi / .governance
+//   system.services.inventory / .risk / .workflows / .auditReader / .documents / .roi / .governance / .simulation
 //   await system.stop();
 //
 // Settings (environment variables — never put them in a file in this repo):
@@ -44,6 +44,7 @@ import { resolveThresholds } from './roi/checks.js';
 import { createPolicyAwareRiskModel } from './risk/riskModel.js';
 import { createGovernanceService, migrateGovernance } from './governance/service.js';
 import { createGovernanceView } from './governance/view.js';
+import { createSimulationService, migrateSimulations } from './simulation/service.js';
 
 export class StartupRefusedError extends Error {
   constructor(message, options) { super(message, options); this.name = 'StartupRefusedError'; }
@@ -101,6 +102,7 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
     await migrateDocuments(db);
     await migrateRoi(db);
     await migrateGovernance(db);
+    await migrateSimulations(db);
   } catch (err) {
     await closeDb();
     throw err;
@@ -142,6 +144,9 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
       rejectProposal: async (args) => { const r = await governanceService.rejectProposal(args); await view.refresh(); return r; },
       inForce: () => view.current(),
     },
+    // Simulations run in their own sandbox (STORY-010), never in this database;
+    // only their reports are kept here.
+    simulation: createSimulationService({ db, audit }),
     // ROI checks its assumptions against saved process analyses (the STORY-002 store
     // beside the log) and against documents, read with the asking user's access rights.
     roi: createRoiService({
