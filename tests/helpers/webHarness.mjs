@@ -32,13 +32,15 @@ export async function startHarness({ db, routes, people = {}, audit: givenAudit 
   });
   const { url } = await api.listen();
 
-  const request = (method, path, { body, as } = {}) => fetch(`${url}${path}`, {
+  // body: sent as JSON. raw + type: sent as-is (file uploads).
+  const request = (method, path, { body, raw, type, as } = {}) => fetch(`${url}${path}`, {
     method,
     headers: {
       ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(raw !== undefined ? { 'Content-Type': type } : {}),
       ...(as ? { Cookie: as.cookie, 'X-CSRF-Token': as.csrf } : {}),
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: raw ?? (body === undefined ? undefined : JSON.stringify(body)),
     signal: AbortSignal.timeout(20000),
   });
   const call = async (method, path, options) => {

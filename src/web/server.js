@@ -8,8 +8,11 @@
 //             cookie — never from the request body — and, if it changes
 //             something (anything but GET), also needs the X-CSRF-Token header.
 //   rateLimit 'sign-in': at most signInLimit.max requests per window per address.
+//   rawBody   { types, maxBytes }: the body is the bytes of a file, not JSON (uploads).
+//             Only the listed content types are taken; none of them is one an HTML
+//             form can send, and the CSRF header is still required.
 //   handle    async (ctx) → { status?, body, headers? }
-//             ctx = { user, body, params, query, requestId, sessionToken, ip }
+//             ctx = { user, body, bytes, params, query, requestId, sessionToken, ip }
 //
 // Every request gets an audit entry, written BEFORE the reply is sent (if it cannot
 // be written, the reply is a 500): api.request when it worked, api.refused (with
@@ -71,20 +74,34 @@ export function createRateLimiter({ max, windowMs, now = () => Date.now(), maxKe
   };
 }
 
-async function readJson(req) {
-  const type = String(req.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase();
-  // Also a CSRF defence: a plain HTML form cannot send application/json.
-  if (type !== 'application/json') throw new ApiRequestError(415, 'Send the request body as JSON, with Content-Type: application/json.');
+// Never one of these: an HTML form can send them without the page's own script.
+const FORM_TYPES = new Set(['application/x-www-form-urlencoded', 'multipart/form-data', 'text/plain']);
+const contentTypeOf = (req) => String(req.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase();
+
+async function readBytes(req, maxBytes) {
+  const tooBig = () => new ApiRequestError(413, `The request body is over ${maxBytes} bytes.`);
   const declared = Number(req.headers['content-length']);
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) throw new ApiRequestError(413, `The request body is over ${MAX_BODY_BYTES} bytes.`);
+  if (Number.isFinite(declared) && declared > maxBytes) throw tooBig();
   const chunks = [];
   let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > MAX_BODY_BYTES) throw new ApiRequestError(413, `The request body is over ${MAX_BODY_BYTES} bytes.`);
+    if (size > maxBytes) throw tooBig();
     chunks.push(chunk);
   }
-  const text = Buffer.concat(chunks).toString('utf8');
+  return Buffer.concat(chunks);
+}
+
+async function readRaw(req, { types, maxBytes }) {
+  const type = contentTypeOf(req);
+  if (!types.includes(type) || FORM_TYPES.has(type)) throw new ApiRequestError(415, `Send the file with one of these content types: ${types.join(', ')}.`);
+  return new Uint8Array(await readBytes(req, maxBytes));
+}
+
+async function readJson(req) {
+  // Also a CSRF defence: a plain HTML form cannot send application/json.
+  if (contentTypeOf(req) !== 'application/json') throw new ApiRequestError(415, 'Send the request body as JSON, with Content-Type: application/json.');
+  const text = (await readBytes(req, MAX_BODY_BYTES)).toString('utf8');
   if (text.trim() === '') return {};
   let body;
   try {
@@ -144,10 +161,12 @@ export function createApiServer({
 
     const changesSomething = !SAFE_METHODS.has(req.method);
     let body = {};
+    let bytes = null;
     let user = null;
     let sessionToken = null;
     try {
-      if (changesSomething) body = await readJson(req);
+      if (changesSomething && match.rawBody) bytes = await readRaw(req, match.rawBody);
+      else if (changesSomething) body = await readJson(req);
       if (match.auth !== 'public') {
         sessionToken = tokenFromCookieHeader(req.headers.cookie);
         const who = await sessions.authenticate({ token: sessionToken, csrfToken: req.headers['x-csrf-token'], changesSomething });
@@ -164,7 +183,7 @@ export function createApiServer({
     let timer;
     try {
       const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new HandlerTimeout()), handlerTimeoutMs); });
-      const result = await Promise.race([match.handle({ user, body, params, query: url.searchParams, requestId, sessionToken, ip }), deadline]);
+      const result = await Promise.race([match.handle({ user, body, bytes, params, query: url.searchParams, requestId, sessionToken, ip }), deadline]);
       const status = result?.status ?? 200;
       log('api.request', { detail: { status } });
       return send(res, status, result?.body ?? {}, result?.headers);
