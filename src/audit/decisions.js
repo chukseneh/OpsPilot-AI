@@ -17,9 +17,9 @@ export const DECISION_ACTIONS = Object.freeze(new Set([
   'operation.rejected', 'task.assigned', 'task.reassigned', 'task.retry_scheduled', 'task.failed',
   'agent.marked_unhealthy', 'agent.recovered',
   // Process analysis and its dashboard (STORY-002, STORY-011)
-  'analysis.denied', 'analysis.rejected', 'dashboard.denied',
+  'analysis.denied', 'analysis.rejected', 'dashboard.denied', 'dashboard.sign_in_rejected',
   // Risk assessment (STORY-003)
-  'risk.denied', 'risk.rejected', 'risk.system_assessed',
+  'risk.denied', 'risk.rejected', 'risk.system_assessed', 'risk.system_unassessed',
   // Inventory (STORY-004)
   'inventory.denied', 'inventory.register_rejected', 'inventory.register_conflict', 'inventory.update_rejected',
   'inventory.update_conflict', 'inventory.status_changed', 'inventory.risk_recorded', 'inventory.risk_rejected',
