@@ -5,7 +5,9 @@
 // ONE way to start the system, and it cannot start with them off:
 //
 //   const system = await startOpsPilot({ env: process.env });
-//   system.services.inventory / .risk / .workflows / .auditReader / .documents / .roi / .governance / .simulation
+//   system.services.inventory / .risk / .workflows / .auditReader / .documents / .roi
+//                  / .governance / .simulation / .analysis / .orchestrator
+//   system.dashboardUrl   when DASHBOARD_PORT is set
 //   await system.stop();
 //
 // Settings (environment variables — never put them in a file in this repo):
@@ -17,6 +19,8 @@
 //   DOCUMENTS_DIR     where uploaded files are kept; default "documents" beside the audit log
 //   GOVERNANCE_JURISDICTION  optional, e.g. UK or EU: whose approved governance policy
 //                    applies (STORY-009). Unset: the built-in rules apply.
+//   DASHBOARD_PORT   optional: start the process-analysis dashboard (STORY-011) on
+//                    127.0.0.1 at this port (0 = any free port). Unset: nothing listens.
 //
 // Startup is refused — with the reason, and never the key — when a setting is
 // missing, when the log's storage is unhealthy (e.g. a half-written last line:
@@ -45,6 +49,12 @@ import { createPolicyAwareRiskModel } from './risk/riskModel.js';
 import { createGovernanceService, migrateGovernance } from './governance/service.js';
 import { createGovernanceView } from './governance/view.js';
 import { createSimulationService, migrateSimulations } from './simulation/service.js';
+import { createAnalysisService } from './analysis/service.js';
+import { createProcessAnalystAgent } from './analysis/processAgent.js';
+import { createRegistry } from './orchestration/agents.js';
+import { createOrchestrator } from './orchestration/orchestrator.js';
+import { createDashboardServer } from './dashboard/server.js';
+import { createDashboardData } from './dashboard/data.js';
 
 export class StartupRefusedError extends Error {
   constructor(message, options) { super(message, options); this.name = 'StartupRefusedError'; }
@@ -73,6 +83,10 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
   const jurisdiction = env.GOVERNANCE_JURISDICTION || null;
   if (jurisdiction && !/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/.test(jurisdiction)) {
     throw new StartupRefusedError(`GOVERNANCE_JURISDICTION "${jurisdiction}" must look like UK, EU or US-CA.`);
+  }
+  const dashboardPort = env.DASHBOARD_PORT === undefined || env.DASHBOARD_PORT === '' ? null : Number(env.DASHBOARD_PORT);
+  if (dashboardPort !== null && !(Number.isInteger(dashboardPort) && dashboardPort >= 0 && dashboardPort <= 65535)) {
+    throw new StartupRefusedError(`DASHBOARD_PORT "${env.DASHBOARD_PORT}" must be a port number from 0 to 65535.`);
   }
   const file = resolve(env.AUDIT_LOG_FILE ?? join('data', 'audit.jsonl'));
   const logId = env.AUDIT_LOG_ID ?? 'main';
@@ -122,6 +136,9 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
   const governanceService = createGovernanceService({ db, audit, ...(now ? { now } : {}) });
   const view = createGovernanceView({ governance: governanceService, jurisdiction, audit });
   const inventory = createInventoryService({ db, audit });
+  // Saved process analyses (STORY-002), beside the log. One store, shared: the
+  // analysis service writes it, the dashboard shows it, ROI reads evidence from it.
+  const analysisStore = createFileResultStore({ file: join(dirname(file), 'analyses.json') });
   const documents = createDocumentService({
     db, audit, governance: view, blobs: createFileBlobStore({ dir: resolve(env.DOCUMENTS_DIR ?? join(dirname(file), 'documents')) }),
   });
@@ -151,11 +168,24 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
     // beside the log) and against documents, read with the asking user's access rights.
     roi: createRoiService({
       db, audit,
-      lookupAnalysis: analysisLookupFrom(createFileResultStore({ file: join(dirname(file), 'analyses.json') })),
+      lookupAnalysis: analysisLookupFrom(analysisStore),
       lookupDocument: documentLookupFrom(documents),
       thresholds: roiThresholds,
     }),
   };
+
+  // STORY-002 process analysis, run by the STORY-001 orchestrator, shown by the
+  // STORY-011 dashboard — on the same keyed, anchored log as everything else.
+  // The analysis time limit is SHORTER than the orchestrator's, so a slow analysis
+  // stops itself rather than being blamed on the agent.
+  services.analysis = createAnalysisService({ audit, store: analysisStore, timeoutMs: 60000 });
+  services.orchestrator = createOrchestrator({
+    registry: createRegistry([createProcessAnalystAgent({ service: services.analysis })]),
+    audit,
+    store: createFileResultStore({ file: join(dirname(file), 'operations.json') }),
+    timeoutMs: 90000,
+  });
+  const dashboard = dashboardPort === null ? null : createDashboardServer({ data: createDashboardData({ store: analysisStore }), audit });
 
   // ---- 7. Record the start, anchor it, and start the timers ----
   try {
@@ -170,10 +200,24 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
   const anchorTimer = anchors.startTimer({ audit, ...(timers.anchors ?? {}) });
   const governanceTimer = view.startTimer(timers.governance ?? {});
 
+  // The dashboard listens last, on this machine only, once everything above is up.
+  let dashboardUrl = null;
+  if (dashboard) {
+    try {
+      ({ url: dashboardUrl } = await dashboard.listen(dashboardPort, '127.0.0.1'));
+      audit.append({ correlationId: 'system', actor: SYSTEM, action: 'system.dashboard_started', detail: { url: dashboardUrl } });
+    } catch (err) {
+      await Promise.all([approvalTimer.stop(), anchorTimer.stop(), governanceTimer.stop()]);
+      await closeDb();
+      throw new StartupRefusedError(`The dashboard could not listen on port ${dashboardPort}: ${err.code ?? err.message}`, { cause: err });
+    }
+  }
+
   let stopping = null;
   function stop() {
     // Safe to call twice: the second call waits for the first.
     stopping ??= (async () => {
+      if (dashboard) await dashboard.close(); // stop taking requests first
       await approvalTimer.stop();
       await anchorTimer.stop();
       await governanceTimer.stop();
@@ -187,5 +231,5 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
     return stopping;
   }
 
-  return { services, audit, anchors, db, file, stop };
+  return { services, audit, anchors, db, file, dashboardUrl, stop };
 }
