@@ -39,6 +39,9 @@ export const DECISION_ACTIONS = Object.freeze(new Set([
   'governance.approved', 'governance.rejected', 'governance.review_overdue',
   // Simulations (STORY-010)
   'simulation.denied', 'simulation.rejected', 'simulation.completed',
+  // Web accounts (extra to the plan)
+  'account.denied', 'account.refused', 'account.bootstrapped', 'account.created', 'account.role_changed',
+  'account.disabled', 'account.enabled', 'account.password_reset', 'account.locked', 'account.sign_in_failed',
 ]));
 
 export const isDecision = (action) => DECISION_ACTIONS.has(action);
