@@ -102,7 +102,10 @@ test('a simulation that runs too long is stopped, reports what finished, and is 
   assert.match(r.error, /took longer than 1000 ms and was stopped after 1 of 2 workflow\(s\)/);
   assert.deepEqual(r.workflows.map((w) => w.id), ['SYN-WF-fast'], 'only what finished within the limit is reported');
   assert.ok(r.sandboxLog.some((e) => e.correlationId === 'SYN-WF-slow'), 'the log still shows the cut-off workflow started');
-  assert.ok(Date.now() - started < 10000, 'it did not hang');
+  // Under 25 s proves the between-steps deadline stopped it, not the backstop timer
+  // (timeoutMs + 30 s = 31 s). Creating the sandbox's database alone can take ~7 s
+  // when the whole suite runs in parallel, so a tighter bound fails on load, not on a bug.
+  assert.ok(Date.now() - started < 25000, 'it was stopped by the deadline, not the backstop');
   assert.deepEqual(readdirSync(workRoot), [], 'the sandbox folder was removed');
 });
 
