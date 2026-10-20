@@ -481,6 +481,10 @@ export function createWorkflowEngine({
 
   function advance(workflowId) {
     const previous = locks.get(workflowId) ?? Promise.resolve();
+    // Not swallowing an error: if the previous call for this workflow failed, that
+    // error already went to ITS caller. The next queued call must still run, not
+    // fail because of someone else's failure — so it waits for the previous one
+    // to settle either way.
     const next = previous.catch(() => {}).then(() => advanceNow(workflowId));
     locks.set(workflowId, next);
     const release = () => { if (locks.get(workflowId) === next) locks.delete(workflowId); };
