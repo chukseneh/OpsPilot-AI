@@ -37,8 +37,10 @@ const SCRYPT = Object.freeze({ N: 16384, r: 8, p: 1, keylen: 64 });
 const COMMON = new Set(['password', 'passw0rd', 'qwerty', 'qwertyuiop', 'letmein', 'welcome', 'admin', 'administrator', 'iloveyou',
   'monkey', 'dragon', 'football', 'baseball', 'opspilot', 'changeme', 'secret', 'abc', 'abcdef', 'login', 'master', 'sunshine']);
 
+// status: the HTTP status the web API answers with (400 bad request, 404 no such
+// account, 409 the username is taken).
 export class AccountError extends Error {
-  constructor(message, options) { super(message, options); this.name = 'AccountError'; }
+  constructor(message, { status = 400, ...options } = {}) { super(message, options); this.name = 'AccountError'; this.status = status; }
 }
 
 export const ACCOUNTS_SCHEMA_SQL = `
@@ -113,9 +115,9 @@ export function createAccountService({ db, audit, now = () => new Date() }) {
     }
     return { type: 'person', id: user.id };
   }
-  const refuse = (actor, subject, why) => {
+  const refuse = (actor, subject, why, status = 400) => {
     log(actor, 'account.refused', { subject, rationale: why });
-    return new AccountError(why);
+    return new AccountError(why, { status });
   };
   const checkNewAccount = (actor, { username, displayName, role, password }) => {
     const subject = typeof username === 'string' ? username : null;
@@ -172,7 +174,7 @@ export function createAccountService({ db, audit, now = () => new Date() }) {
         "INSERT INTO user_accounts (username, display_name, role, password_hash, status, created_by) VALUES ($1, $2, $3, $4, 'active', $5) ON CONFLICT (username) DO NOTHING RETURNING *",
         [username, displayName.trim(), role, hash, user.id],
       );
-      if (!row) throw refuse(actor, username, `the username "${username}" is taken`);
+      if (!row) throw refuse(actor, username, `the username "${username}" is taken`, 409);
       logOk('account.created', { rationale: reason.trim(), detail: { role, displayName: displayName.trim() } });
       return publicAccount(row);
     });
@@ -185,7 +187,7 @@ export function createAccountService({ db, audit, now = () => new Date() }) {
     if (username === user.id) throw refuse(actor, username, `you may not ${what} on your own account; ask another security officer`);
     return committed(actor, username, async (tx, logOk) => {
       const { rows: [row] } = await tx.query('SELECT * FROM user_accounts WHERE username = $1 FOR UPDATE', [username]);
-      if (!row) throw refuse(actor, username, `there is no account "${username}"`);
+      if (!row) throw refuse(actor, username, `there is no account "${username}"`, 404);
       const { set, detail } = await fn(row, actor);
       // Column names come only from the fixed sets above, never from the caller.
       const fields = Object.keys(set);
@@ -277,10 +279,29 @@ export function createAccountService({ db, audit, now = () => new Date() }) {
     return { ok: true, account: publicAccount(current) };
   }
 
+  // For the system itself (sessions); no permission check, so never expose it directly.
   async function getAccount(username) {
     const row = await get(username);
     return row ? publicAccount(row) : null;
   }
 
-  return { bootstrapFirstAdmin, createAccount, changeRole, disableAccount, enableAccount, resetPassword, changeOwnPassword, verifyCredentials, getAccount };
+  // For people: security officers only, and the view is logged.
+  async function listAccounts({ user } = {}) {
+    const actor = asAdmin(user, 'list accounts', null);
+    const { rows } = await db.query('SELECT * FROM user_accounts ORDER BY username');
+    log(actor, 'account.listed', { subject: null, detail: { count: rows.length } });
+    return rows.map(publicAccount);
+  }
+  async function viewAccount({ user, username } = {}) {
+    const actor = asAdmin(user, 'view accounts', username ?? null);
+    const row = typeof username === 'string' ? await get(username) : null;
+    if (!row) throw refuse(actor, username ?? null, `there is no account "${username}"`, 404);
+    log(actor, 'account.viewed', { subject: username });
+    return publicAccount(row);
+  }
+
+  return {
+    bootstrapFirstAdmin, createAccount, changeRole, disableAccount, enableAccount, resetPassword, changeOwnPassword,
+    verifyCredentials, getAccount, listAccounts, viewAccount,
+  };
 }
