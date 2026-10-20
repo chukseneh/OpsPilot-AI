@@ -3,13 +3,13 @@
   "project": "OpsPilot AI — Enterprise AI Operations, Workflow & Risk Automation Platform",
   "totals": {
     "stories_total": 12,
-    "stories_verified": 11,
+    "stories_verified": 12,
     "stories_submitted": 0,
-    "stories_in_progress": 1,
+    "stories_in_progress": 0,
     "stories_not_started": 0,
     "criteria_total": 38,
-    "criteria_passed": 35,
-    "points_awarded": 1510
+    "criteria_passed": 38,
+    "points_awarded": 1577
   },
   "stories": [
     {
@@ -75,7 +75,7 @@
         "verified_at": "2026-10-01T10:07:46.651Z",
         "commit_sha": "e163557fa044752cd2f17f7fe8358e5b3d9fe337",
         "commit_url": "https://github.com/chukseneh/OpsPilot-AI/commit/e163557fa044752cd2f17f7fe8358e5b3d9fe337",
-        "commit_at": "2026-10-01T10:07:39Z",
+        "commit_at": "2026-10-05T00:27:47Z",
         "points_awarded": 200,
         "outstanding": []
       }
@@ -125,7 +125,7 @@
         "verified_at": "2026-10-02T02:51:26.931Z",
         "commit_sha": "1ac7413972543b855b81aee586ba6e5d3796c3d5",
         "commit_url": "https://github.com/chukseneh/OpsPilot-AI/commit/1ac7413972543b855b81aee586ba6e5d3796c3d5",
-        "commit_at": "2026-10-02T02:51:19Z",
+        "commit_at": "2026-10-02T03:19:46Z",
         "points_awarded": 147,
         "outstanding": []
       }
@@ -594,19 +594,15 @@
       "notes": "Workflow simulation on synthetic data: a scenario declares synthetic AI systems, STORY-005 workflows, scripted approvals and the expected risk level and outcome of every step. Data not clearly marked synthetic (synthetic flag, SYN- ids, (SYNTHETIC) names) or otherwise invalid is refused with every problem listed, and nothing runs; a seeded generator makes larger scenarios with expectations from its own independent rules, and its output is checked the same way. Each run uses an isolated sandbox (its own in-memory database, inventory, audit log and stand-in executors) with the real workflow engine and optional STORY-009 policy, under a time limit, and is always torn down. Results are compared step by step: passed, failed (mismatches described; a step that should have needed a person but ran without one is CRITICAL), timed_out or error. Reports (with the sandbox's own log) are saved; every run is in the keyed main audit log with a plain-words rationale. System testers and process managers only. Demo: node src/demo/simulation.js.",
       "updated_at": "2026-10-20T00:00:00.000Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 80,
-        "outstanding": [
-          "Given synthetic data is available, When a workflow is simulated, Then it executes as expected.",
-          "Given synthetic data is incorrect, When a workflow is simulated, Then it flags errors.",
-          "Trust: Simulation results are logged for review."
-        ]
+        "verified_at": "2026-10-19T23:37:12.750Z",
+        "commit_sha": "2346f215ccd060a26d28bb4d88b34443129712ee",
+        "commit_url": "https://github.com/chukseneh/OpsPilot-AI/commit/2346f215ccd060a26d28bb4d88b34443129712ee",
+        "commit_at": "2026-10-19T23:33:41Z",
+        "points_awarded": 147,
+        "outstanding": []
       }
     },
     {
