@@ -42,6 +42,7 @@ export const DECISION_ACTIONS = Object.freeze(new Set([
   // Web accounts (extra to the plan)
   'account.denied', 'account.refused', 'account.bootstrapped', 'account.created', 'account.role_changed',
   'account.disabled', 'account.enabled', 'account.password_reset', 'account.locked', 'account.sign_in_failed',
+  'session.rejected', 'session.expired', 'session.csrf_rejected',
 ]));
 
 export const isDecision = (action) => DECISION_ACTIONS.has(action);
