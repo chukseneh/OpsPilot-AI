@@ -3,7 +3,8 @@
 //   proposePolicy({ user, policy, effectiveFrom, reason })        → the proposed version
 //   approveProposal({ user, jurisdiction, version, note })        → the approved version
 //   rejectProposal({ user, jurisdiction, version, note })         → the rejected version
-//   getActivePolicy({ jurisdiction, at })                         → the policy in force (or null)
+//   getActivePolicy({ jurisdiction, at })                         → the policy in force (or null); internal, unchecked
+//   viewActivePolicy({ user, jurisdiction })                      → the same, for people: any project role, logged
 //   listVersions({ user, jurisdiction })                          → every version, newest first
 //   checkReviewDates()                                            → policies whose review date has passed
 //
@@ -25,13 +26,15 @@
 // its reason and the DIFF against the version in force (each setting, from → to).
 
 import { fingerprint, stableJson } from '../lib/fingerprint.js';
-import { roleAllowed } from '../lib/roles.js';
+import { roleAllowed, PROJECT_ROLES } from '../lib/roles.js';
 import { PermissionDeniedError } from '../analysis/service.js';
 import { validatePolicy } from './policy.js';
 
 export { PermissionDeniedError };
 export const PROPOSER_ROLES = Object.freeze(['compliance officer']);
 export const APPROVER_ROLES = Object.freeze(['compliance officer', 'security officer']);
+// Who may read the policy in force (web access): everyone works under it.
+export const POLICY_READER_ROLES = PROJECT_ROLES;
 
 export class PolicyMisconfiguredError extends Error {
   constructor(alerts) {
@@ -43,6 +46,9 @@ export class PolicyMisconfiguredError extends Error {
 }
 export class GovernanceRequestError extends Error {
   constructor(message, options) { super(message, options); this.name = 'GovernanceRequestError'; }
+}
+export class PolicyNotFoundError extends Error {
+  constructor(message, options) { super(message, options); this.name = 'PolicyNotFoundError'; }
 }
 
 export const GOVERNANCE_SCHEMA_SQL = `
@@ -260,6 +266,18 @@ export function createGovernanceService({ db, audit, now = () => new Date() }) {
     return { ...v, alerts, reviewOverdue: alerts.some((a) => a.control === 'reviewBy' && /has passed/.test(a.message)) };
   }
 
+  async function viewActivePolicy({ user, jurisdiction } = {}) {
+    const correlationId = `governance:${jurisdiction ?? 'unknown'}`;
+    const actor = authorise(user, POLICY_READER_ROLES, correlationId, 'view the governance policy in force');
+    const active = isNonEmpty(jurisdiction) ? await getActivePolicy({ jurisdiction }) : null;
+    if (!active) {
+      log(correlationId, actor, 'governance.viewed', { rationale: 'No policy is in force.', detail: { active: true, version: null } });
+      throw new PolicyNotFoundError(`No governance policy is in force for ${jurisdiction}.`);
+    }
+    log(correlationId, actor, 'governance.viewed', { subject: `${jurisdiction} v${active.version}`, detail: { active: true, version: active.version } });
+    return active;
+  }
+
   async function listVersions({ user, jurisdiction } = {}) {
     const actor = authorise(user, APPROVER_ROLES, `governance:${jurisdiction}`, 'view governance policies');
     const { rows } = await db.query(`SELECT ${ROW} FROM policy_versions WHERE jurisdiction = $1 ORDER BY version DESC`, [jurisdiction]);
@@ -292,6 +310,6 @@ export function createGovernanceService({ db, audit, now = () => new Date() }) {
     proposePolicy,
     approveProposal: (args) => decide('approve', args),
     rejectProposal: (args) => decide('reject', args),
-    getActivePolicy, listVersions, checkReviewDates,
+    getActivePolicy, viewActivePolicy, listVersions, checkReviewDates,
   };
 }

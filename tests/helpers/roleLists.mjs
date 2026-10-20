@@ -9,7 +9,7 @@ export { ACCOUNT_ADMIN_ROLES } from '../../src/web/accounts.js';
 export { DASHBOARD_ROLES } from '../../src/dashboard/server.js';
 export { UPLOAD_ROLES, REVIEWER_ROLES } from '../../src/documents/service.js';
 export { KNOWN_ROLES } from '../../src/governance/policy.js';
-export { PROPOSER_ROLES, APPROVER_ROLES as GOVERNANCE_APPROVER_ROLES } from '../../src/governance/service.js';
+export { PROPOSER_ROLES, APPROVER_ROLES as GOVERNANCE_APPROVER_ROLES, POLICY_READER_ROLES } from '../../src/governance/service.js';
 export { EDIT_ROLES, VIEW_ROLES, RECORD_RISK_ROLES } from '../../src/inventory/service.js';
 export { RISK_ROLES } from '../../src/risk/service.js';
 export { ROI_ROLES } from '../../src/roi/service.js';

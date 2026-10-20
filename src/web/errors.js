@@ -9,7 +9,7 @@
 
 import { PermissionDeniedError, AnalysisRequestError } from '../analysis/service.js';
 import { RiskRequestError } from '../risk/service.js';
-import { GovernanceRequestError, PolicyMisconfiguredError } from '../governance/service.js';
+import { GovernanceRequestError, PolicyMisconfiguredError, PolicyNotFoundError } from '../governance/service.js';
 import { WorkflowRequestError, WorkflowNotFoundError } from '../automation/workflows.js';
 import { AuditReadRequestError } from '../audit/reader.js';
 import { AuditRepairRefusedError } from '../audit/storage.js';
@@ -34,7 +34,7 @@ const STATUS = [
     AuditReadRequestError, DocumentRequestError, DocumentReadError, InventoryRequestError, SimulationRequestError,
     ScenarioError, RoiRequestError, RoiInputError]],
   [415, [UnsupportedFormatError]],
-  [404, [WorkflowNotFoundError, DocumentNotFoundError, SystemNotFoundError, SimulationNotFoundError, RoiScenarioNotFoundError]],
+  [404, [WorkflowNotFoundError, PolicyNotFoundError, DocumentNotFoundError, SystemNotFoundError, SimulationNotFoundError, RoiScenarioNotFoundError]],
   [409, [InventoryConflictError, AuditRepairRefusedError]],
 ];
 
