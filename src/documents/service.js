@@ -26,16 +26,15 @@
 
 import { createHash } from 'node:crypto';
 
-import { roleAllowed } from '../lib/roles.js';
+import { roleAllowed, PROJECT_ROLES } from '../lib/roles.js';
 import { PermissionDeniedError } from '../analysis/service.js';
 import { readDocument, UnsupportedFormatError, DocumentReadError } from './formats.js';
 import { extractFields, KINDS, REQUIRED } from './extract.js';
 import { DocumentUploadError } from './blobStore.js';
 
 export { PermissionDeniedError, DocumentUploadError };
-export const UPLOAD_ROLES = Object.freeze([
-  'operations manager', 'process analyst', 'process manager', 'compliance officer', 'IT manager', 'security officer', 'financial analyst',
-]);
+// "Any known role may upload" (the student's choice): every role in the project.
+export const UPLOAD_ROLES = PROJECT_ROLES;
 export const REVIEWER_ROLES = Object.freeze(['compliance officer', 'financial analyst']);
 export const DOCUMENT_STATUSES = Object.freeze(['extracted', 'flagged_for_review', 'reviewed', 'rejected']);
 

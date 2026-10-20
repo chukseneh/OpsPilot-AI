@@ -32,11 +32,10 @@
 //   - audit records are kept for at least a year (REQ-008).
 
 import { DATA_CATEGORIES, DECISION_IMPACTS } from '../risk/systemData.js';
+import { PROJECT_ROLES } from '../lib/roles.js';
 
-export const KNOWN_ROLES = Object.freeze([
-  'operations manager', 'process analyst', 'process manager', 'compliance officer',
-  'IT manager', 'security officer', 'financial analyst', 'data analyst',
-]);
+// The roles a policy may name: every role in the project (one shared list).
+export const KNOWN_ROLES = PROJECT_ROLES;
 export const SYSTEM_FLOORS = Object.freeze({ highRiskActionsNeedApproval: true, minAuditRetentionDays: 365 });
 const LONG_RETENTION_DAYS = 3650;
 const MAX_REVIEW_AHEAD_DAYS = 730;
