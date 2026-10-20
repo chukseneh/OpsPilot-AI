@@ -4,7 +4,8 @@
 export { ANALYSIS_ROLES } from '../../src/analysis/service.js';
 export { AUDIT_READER_ROLES } from '../../src/audit/reader.js';
 export { REPAIR_ROLES } from '../../src/audit/storage.js';
-export { START_ROLES, APPROVER_ROLES as WORKFLOW_APPROVER_ROLES, ESCALATED_APPROVER_ROLES } from '../../src/automation/workflows.js';
+export { START_ROLES, APPROVER_ROLES as WORKFLOW_APPROVER_ROLES, ESCALATED_APPROVER_ROLES, VIEW_ROLES as WORKFLOW_VIEW_ROLES } from '../../src/automation/workflows.js';
+export { ACCOUNT_ADMIN_ROLES } from '../../src/web/accounts.js';
 export { DASHBOARD_ROLES } from '../../src/dashboard/server.js';
 export { UPLOAD_ROLES, REVIEWER_ROLES } from '../../src/documents/service.js';
 export { KNOWN_ROLES } from '../../src/governance/policy.js';

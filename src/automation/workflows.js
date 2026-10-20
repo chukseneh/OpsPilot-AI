@@ -16,7 +16,8 @@
 //   checkApprovalDelays()                               → escalate / expire approvals that waited too long
 //   startApprovalTimer({ everyMs })                     → run checkApprovalDelays() on a schedule
 //   resumeWorkflow({ user, workflowId })                → retry a failed workflow from the failed step
-//   getWorkflow(workflowId)                             → { run, actions }
+//   getWorkflow(workflowId)                             → { run, actions }   (internal: no permission check)
+//   viewWorkflow({ user, workflowId })                  → { run, actions }   (for people: checked and logged)
 //
 // Idempotent: the same workflowId with the same actions returns the existing run;
 // each action runs with the idempotency key "<workflowId>:<step>", so a retry,
@@ -39,6 +40,8 @@ export const START_ROLES = Object.freeze(['process manager', 'operations manager
 // compliance officer. Never the person who started the workflow.
 export const APPROVER_ROLES = Object.freeze(['process manager']);
 export const ESCALATED_APPROVER_ROLES = Object.freeze(['process manager', 'operations manager', 'compliance officer']);
+// Who may look at a workflow (web access): anyone who may start one or decide its steps.
+export const VIEW_ROLES = Object.freeze(['process manager', 'operations manager', 'compliance officer']);
 
 export const RUN_STATUSES = Object.freeze(['running', 'awaiting_approval', 'completed', 'failed', 'rejected', 'expired']);
 
@@ -52,6 +55,9 @@ export const ACTION_STATUSES = Object.freeze(['pending', 'awaiting_approval', 'a
 
 export class WorkflowRequestError extends Error {
   constructor(message, options) { super(message, options); this.name = 'WorkflowRequestError'; }
+}
+export class WorkflowNotFoundError extends Error {
+  constructor(message, options) { super(message, options); this.name = 'WorkflowNotFoundError'; }
 }
 
 const list = (values) => values.map((v) => `'${v}'`).join(', ');
@@ -236,6 +242,18 @@ export function createWorkflowEngine({
       throw err;
     }
     return advance(workflowId);
+  }
+
+  async function viewWorkflow({ user, workflowId } = {}) {
+    const actor = authorise(user, VIEW_ROLES, workflowId, 'view workflows');
+    const log = logFor(isNonEmpty(workflowId) ? workflowId : 'invalid-request', actor);
+    const wf = isNonEmpty(workflowId) ? await getWorkflow(workflowId) : null;
+    if (!wf) {
+      log('workflow.rejected', { rationale: `there is no workflow ${workflowId}` });
+      throw new WorkflowNotFoundError(`There is no workflow ${workflowId}.`);
+    }
+    log('workflow.viewed', { detail: { status: wf.run.status } });
+    return wf;
   }
 
   async function resumeWorkflow({ user, workflowId } = {}) {
@@ -589,5 +607,5 @@ export function createWorkflowEngine({
     });
   }
 
-  return { startWorkflow, resumeWorkflow, decide, checkApprovalDelays, startApprovalTimer, getWorkflow, advance };
+  return { startWorkflow, resumeWorkflow, decide, checkApprovalDelays, startApprovalTimer, getWorkflow, viewWorkflow, advance };
 }
