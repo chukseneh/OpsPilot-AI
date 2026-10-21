@@ -11,7 +11,8 @@ import { randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
 
 import { startOpsPilot, StartupRefusedError } from '../src/system.js';
-import { createFirstAdmin } from '../src/web/createFirstAdmin.js';
+import { createFirstAdmin, main, readFirstLine } from '../src/web/createFirstAdmin.js';
+import { Readable } from 'node:stream';
 import { AccountError } from '../src/web/accounts.js';
 import { createSessionService } from '../src/web/sessions.js';
 import { createAuditLog } from '../src/audit/auditLog.js';
@@ -141,33 +142,47 @@ function runCli(args, { env, stdin }) {
     let out = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });
-    // Each run starts the whole system in a new process: ~2 s alone, but over 60 s
-    // while every other test file is also starting databases. The limit only has to
-    // catch a hang, not measure speed.
-    const timer = setTimeout(() => { child.kill(); reject(new Error(`the command did not finish: ${out}`)); }, 240000);
+    // These runs refuse before starting the system, so they are quick. (Runs that
+    // start the whole system in a child process sometimes stalled for minutes while
+    // every other test file was starting databases too, so that path is tested
+    // in-process below, through the same main().)
+    const timer = setTimeout(() => { child.kill(); reject(new Error(`the command did not finish: ${out}`)); }, 60000);
     child.on('close', (code) => { clearTimeout(timer); resolve({ code, out }); });
     child.stdin.end(stdin);
   });
 }
 
-test('the command, run for real with --password-stdin: works once, then refuses; the password is never printed', async () => {
-  const env = envFor();
-  const first = await runCli(['--username', 'sec.admin', '--password-stdin'], { env, stdin: `${ADMIN_PW}\n` });
-  assert.equal(first.code, 0, first.out);
-  assert.match(first.out, /Created the first security officer account "sec.admin"/);
-  const second = await runCli(['--username', 'sec.two', '--password-stdin'], { env, stdin: 'silver-kettle-river-12\n' });
-  assert.equal(second.code, 1);
-  assert.match(second.out, /Not created: accounts already exist/);
-  const noName = await runCli(['--password-stdin'], { env, stdin: `${ADMIN_PW}\n` });
+test('the command, run for real, refuses without --username or without a terminal, and never prints the password', async () => {
+  const noName = await runCli(['--password-stdin'], { env: envFor(), stdin: `${ADMIN_PW}\n` });
   assert.equal(noName.code, 1);
-  assert.match(noName.out, /--username/);
-  for (const r of [first, second, noName]) assert.ok(!r.out.includes(ADMIN_PW) && !r.out.includes('silver-kettle-river-12'));
+  assert.match(noName.out, /Not created: Give the account a name: --username/);
+  const noTerminal = await runCli(['--username', 'sec.admin'], { env: envFor(), stdin: `${ADMIN_PW}\n` });
+  assert.equal(noTerminal.code, 1);
+  assert.match(noTerminal.out, /Run this in a terminal/);
+  for (const r of [noName, noTerminal]) assert.ok(!r.out.includes(ADMIN_PW));
 });
 
-test('without a terminal or --password-stdin, the command refuses rather than read a visible password', async () => {
-  const r = await runCli(['--username', 'sec.admin'], { env: envFor(), stdin: `${ADMIN_PW}\n` });
-  assert.equal(r.code, 1);
-  assert.match(r.out, /Run this in a terminal/);
+test('--password-stdin takes the first line of standard input: works once, then refuses; the password is never printed', async () => {
+  const env = envFor();
+  const printed = [];
+  const print = (s) => printed.push(s);
+  const account = await main(['--username', 'sec.admin', '--password-stdin'], { stdin: Readable.from([`${ADMIN_PW}\r\n`, 'ignored second line\n']), env, print });
+  assert.equal(account.id, 'sec.admin');
+  await assert.rejects(main(['--username', 'sec.two', '--password-stdin'], { stdin: Readable.from(['silver-kettle-river-12\n']), env, print }), /accounts already exist/);
+  assert.ok(!printed.join('\n').includes(ADMIN_PW));
+  // The line ending was not part of the password: it signs in with exactly ADMIN_PW.
+  const sys = await startOpsPilot({ env, timers });
+  try {
+    assert.equal((await sys.services.accounts.verifyCredentials({ username: 'sec.admin', password: ADMIN_PW })).ok, true);
+  } finally {
+    await sys.stop();
+  }
+});
+
+test('reading the first line copes with the line arriving in pieces', async () => {
+  assert.equal(await readFirstLine(Readable.from(['corr', 'ect-horse', '-battery-staple\nrest'])), ADMIN_PW);
+  assert.equal(await readFirstLine(Readable.from([`${ADMIN_PW}`])), ADMIN_PW, 'no line ending at all');
+  assert.equal(await readFirstLine(Readable.from([])), '');
 });
 
 // ---- The session clean-up timer ----

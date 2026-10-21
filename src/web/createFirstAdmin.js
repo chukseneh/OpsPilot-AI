@@ -60,7 +60,7 @@ function readHidden(prompt) {
   });
 }
 
-async function readFirstLine(stream) {
+export async function readFirstLine(stream) {
   let text = '';
   for await (const chunk of stream) {
     text += chunk;
@@ -69,14 +69,15 @@ async function readFirstLine(stream) {
   return text.split(/\r?\n/)[0];
 }
 
-async function main(args) {
+// The command itself. `stdin`, `env` and `print` are replaceable for tests.
+export async function main(args, { stdin = process.stdin, env = process.env, print = console.log } = {}) {
   const username = argValue(args, '--username');
   if (!username) throw new AccountError('Give the account a name: --username sec.admin');
   let readPassword;
   if (args.includes('--password-stdin')) {
-    readPassword = () => readFirstLine(process.stdin);
+    readPassword = () => readFirstLine(stdin);
   } else {
-    if (!process.stdin.isTTY) throw new AccountError('Run this in a terminal so the password can be typed without being shown, or use --password-stdin.');
+    if (!stdin.isTTY) throw new AccountError('Run this in a terminal so the password can be typed without being shown, or use --password-stdin.');
     readPassword = async () => {
       const first = await readHidden('Password for the first security officer (12+ characters, not shown): ');
       const again = await readHidden('The same password again: ');
@@ -84,7 +85,7 @@ async function main(args) {
       return first;
     };
   }
-  await createFirstAdmin({ env: process.env, username, displayName: argValue(args, '--display-name'), readPassword });
+  return createFirstAdmin({ env, username, displayName: argValue(args, '--display-name'), readPassword, print });
 }
 
 // Run when called as a script, not when imported by a test.
