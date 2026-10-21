@@ -5,6 +5,7 @@
 //                                         → { ok: true, user, sessionId } | { ok: false, reason }
 //   signOut({ token })                    → { signedOut: true | false }   (safe to repeat)
 //   purgeExpired()                        → { removed }
+//   startPurgeTimer({ everyMs })          → { tick, stop }: purgeExpired() every 5 minutes
 //
 // Tokens:
 //   - 32 random bytes each for the session and its CSRF token. Only their SHA-256
@@ -157,5 +158,35 @@ export function createSessionService({ db, audit, accounts, now = () => new Date
     return { removed: rows.length };
   }
 
-  return { signIn, authenticate, signOut, purgeExpired };
+  // purgeExpired() on a schedule. A failed run is reported and logged, and tried
+  // again next time; expired sessions are refused when used either way.
+  function startPurgeTimer({ everyMs = 5 * 60 * 1000, timers = { setInterval, clearInterval }, onError = (msg) => { console.error(`sessions: ${msg}`); } } = {}) {
+    let running = null;
+    let stopped = false;
+    const tick = () => {
+      if (stopped) return Promise.resolve(null);
+      running ??= (async () => {
+        try {
+          return await purgeExpired();
+        } catch (err) {
+          const why = `${err?.name ?? 'Error'}: ${err?.message ?? err}`;
+          onError(`could not remove expired sessions: ${why}`);
+          try {
+            audit.append({ correlationId: 'session:purge', actor: SESSIONS, action: 'session.purge_failed', rationale: why });
+          } catch (auditErr) {
+            onError(`could not record that in the audit log: ${auditErr?.message ?? auditErr}`);
+          }
+          return null;
+        } finally {
+          running = null;
+        }
+      })();
+      return running;
+    };
+    const handle = timers.setInterval(tick, everyMs);
+    handle?.unref?.();
+    return { tick, async stop() { stopped = true; timers.clearInterval(handle); await running; } };
+  }
+
+  return { signIn, authenticate, signOut, purgeExpired, startPurgeTimer };
 }

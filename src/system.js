@@ -7,7 +7,9 @@
 //   const system = await startOpsPilot({ env: process.env });
 //   system.services.inventory / .risk / .workflows / .auditReader / .documents / .roi
 //                  / .governance / .simulation / .analysis / .orchestrator
+//                  / .accounts / .sessions
 //   system.dashboardUrl   when DASHBOARD_PORT is set
+//   system.webUrl         when WEB_PORT is set
 //   await system.stop();
 //
 // Settings (environment variables — never put them in a file in this repo):
@@ -21,6 +23,12 @@
 //                    applies (STORY-009). Unset: the built-in rules apply.
 //   DASHBOARD_PORT   optional: start the process-analysis dashboard (STORY-011) on
 //                    127.0.0.1 at this port (0 = any free port). Unset: nothing listens.
+//   WEB_PORT         optional: start the JSON web API (src/web/) on 127.0.0.1 at this
+//                    port. To reach it from other machines, put a TLS proxy in front.
+//   WEB_SECURE_COOKIES  "true" when that proxy serves HTTPS: the session cookie is
+//                    then marked Secure. Default "false".
+// The first security officer account is created once with
+// `npm run create-first-admin`; there are no default accounts or passwords.
 //
 // Startup is refused — with the reason, and never the key — when a setting is
 // missing, when the log's storage is unhealthy (e.g. a half-written last line:
@@ -55,6 +63,9 @@ import { createRegistry } from './orchestration/agents.js';
 import { createOrchestrator } from './orchestration/orchestrator.js';
 import { createDashboardServer } from './dashboard/server.js';
 import { createDashboardData } from './dashboard/data.js';
+import { createAccountService, migrateAccounts } from './web/accounts.js';
+import { createSessionService, migrateSessions } from './web/sessions.js';
+import { createWebApi } from './web/api.js';
 
 export class StartupRefusedError extends Error {
   constructor(message, options) { super(message, options); this.name = 'StartupRefusedError'; }
@@ -88,6 +99,14 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
   if (dashboardPort !== null && !(Number.isInteger(dashboardPort) && dashboardPort >= 0 && dashboardPort <= 65535)) {
     throw new StartupRefusedError(`DASHBOARD_PORT "${env.DASHBOARD_PORT}" must be a port number from 0 to 65535.`);
   }
+  const webPort = env.WEB_PORT === undefined || env.WEB_PORT === '' ? null : Number(env.WEB_PORT);
+  if (webPort !== null && !(Number.isInteger(webPort) && webPort >= 0 && webPort <= 65535)) {
+    throw new StartupRefusedError(`WEB_PORT "${env.WEB_PORT}" must be a port number from 0 to 65535.`);
+  }
+  if (![undefined, '', 'true', 'false'].includes(env.WEB_SECURE_COOKIES)) {
+    throw new StartupRefusedError(`WEB_SECURE_COOKIES "${env.WEB_SECURE_COOKIES}" must be "true" or "false".`);
+  }
+  const secureCookies = env.WEB_SECURE_COOKIES === 'true';
   const file = resolve(env.AUDIT_LOG_FILE ?? join('data', 'audit.jsonl'));
   const logId = env.AUDIT_LOG_ID ?? 'main';
   mkdirSync(dirname(file), { recursive: true });
@@ -117,6 +136,8 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
     await migrateRoi(db);
     await migrateGovernance(db);
     await migrateSimulations(db);
+    await migrateAccounts(db);
+    await migrateSessions(db);
   } catch (err) {
     await closeDb();
     throw err;
@@ -185,7 +206,11 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
     store: createFileResultStore({ file: join(dirname(file), 'operations.json') }),
     timeoutMs: 90000,
   });
+  // Web access: accounts prove who is calling; the API passes that identity to the services.
+  services.accounts = createAccountService({ db, audit, ...(now ? { now } : {}) });
+  services.sessions = createSessionService({ db, audit, accounts: services.accounts, ...(now ? { now } : {}) });
   const dashboard = dashboardPort === null ? null : createDashboardServer({ data: createDashboardData({ store: analysisStore }), audit });
+  const web = webPort === null ? null : createWebApi({ services, audit, secureCookies });
 
   // ---- 7. Record the start, anchor it, and start the timers ----
   try {
@@ -199,25 +224,33 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
   const approvalTimer = services.workflows.startApprovalTimer(timers.approvals ?? {});
   const anchorTimer = anchors.startTimer({ audit, ...(timers.anchors ?? {}) });
   const governanceTimer = view.startTimer(timers.governance ?? {});
+  const sessionTimer = services.sessions.startPurgeTimer(timers.sessions ?? {});
 
-  // The dashboard listens last, on this machine only, once everything above is up.
+  // The dashboard and the web API listen last, on this machine only, once everything above is up.
   let dashboardUrl = null;
-  if (dashboard) {
+  let webUrl = null;
+  const listen = async (server, port, name, action) => {
     try {
-      ({ url: dashboardUrl } = await dashboard.listen(dashboardPort, '127.0.0.1'));
-      audit.append({ correlationId: 'system', actor: SYSTEM, action: 'system.dashboard_started', detail: { url: dashboardUrl } });
+      const { url } = await server.listen(port, '127.0.0.1');
+      audit.append({ correlationId: 'system', actor: SYSTEM, action, detail: { url } });
+      return url;
     } catch (err) {
-      await Promise.all([approvalTimer.stop(), anchorTimer.stop(), governanceTimer.stop()]);
+      if (dashboardUrl) await dashboard.close();
+      await Promise.all([approvalTimer.stop(), anchorTimer.stop(), governanceTimer.stop(), sessionTimer.stop()]);
       await closeDb();
-      throw new StartupRefusedError(`The dashboard could not listen on port ${dashboardPort}: ${err.code ?? err.message}`, { cause: err });
+      throw new StartupRefusedError(`The ${name} could not listen on port ${port}: ${err.code ?? err.message}`, { cause: err });
     }
-  }
+  };
+  if (dashboard) dashboardUrl = await listen(dashboard, dashboardPort, 'dashboard', 'system.dashboard_started');
+  if (web) webUrl = await listen(web, webPort, 'web API', 'system.web_started');
 
   let stopping = null;
   function stop() {
     // Safe to call twice: the second call waits for the first.
     stopping ??= (async () => {
-      if (dashboard) await dashboard.close(); // stop taking requests first
+      if (web) await web.close(); // stop taking requests first
+      if (dashboard) await dashboard.close();
+      await sessionTimer.stop();
       await approvalTimer.stop();
       await anchorTimer.stop();
       await governanceTimer.stop();
@@ -231,5 +264,5 @@ export async function startOpsPilot({ env = process.env, executors = {}, timers 
     return stopping;
   }
 
-  return { services, audit, anchors, db, file, dashboardUrl, stop };
+  return { services, audit, anchors, db, file, dashboardUrl, webUrl, stop };
 }
