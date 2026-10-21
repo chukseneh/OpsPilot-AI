@@ -36,16 +36,18 @@ async function setup() {
   const notifyBehaviour = {};
   const executors = { payment: createStandInExecutor('payment'), notify: createStandInExecutor('notify', notifyBehaviour) };
   let engine;
+  let clock = Date.now();
   const h = await startHarness({
     db: pg, people: PEOPLE,
     routes: (audit) => {
-      engine = createWorkflowEngine({ db: pg, audit, executors, runOptions: { retryDelayMs: 1 } });
+      engine = createWorkflowEngine({ db: pg, audit, executors, runOptions: { retryDelayMs: 1 }, now: () => new Date(clock) });
       return workflowRoutes({ workflows: engine });
     },
   });
   const people = {};
   for (const name of Object.keys(PEOPLE)) people[name] = await h.signIn(name);
-  return { ...h, executors, notifyBehaviour, people, engine };
+  const advance = (ms) => { clock += ms; };
+  return { ...h, executors, notifyBehaviour, people, engine, advance };
 }
 const withApi = (name, fn) => test(name, async () => {
   const ctx = await setup();
@@ -136,6 +138,48 @@ withApi('a decision needs a note, a real step and the CSRF token', async ({ call
     body: JSON.stringify({ decision: 'approve', note: 'x' }), signal: AbortSignal.timeout(10000),
   });
   assert.equal(noCsrf.status, 403);
+});
+
+const HOUR = 60 * 60 * 1000;
+const waitingFor = async (call, as) => {
+  const r = await call('GET', '/api/v1/approvals', { as });
+  assert.equal(r.status, 200, r.text);
+  return r.json.approvals.map((a) => `${a.workflowId}:${a.step}`);
+};
+
+withApi('the approvals list shows each approver the steps they may decide, never their own', async ({ call, people, audit }) => {
+  await call('POST', '/api/v1/workflows', { as: people['pm.starter'], body: PAY_AND_NOTIFY });
+  const listed = await call('GET', '/api/v1/approvals', { as: people['pm.approver'] });
+  assert.equal(listed.json.approvals.length, 1);
+  const a = listed.json.approvals[0];
+  assert.deepEqual([a.workflowId, a.workflowName, a.requestedBy, a.step, a.type, a.riskLevel, a.status],
+    ['WF-WEB-1', 'Pay the auditor and tell finance', 'pm.starter', 1, 'payment', 'high', 'awaiting_approval']);
+  assert.ok(a.riskReasons.length > 0 && a.deadlineAt, 'with why it is high risk and when it expires');
+
+  assert.deepEqual(await waitingFor(call, people['pm.starter']), [], 'not the starter: they may not approve it');
+  assert.deepEqual(await waitingFor(call, people['ops.manager']), [], 'not before it is escalated');
+  assert.deepEqual(await waitingFor(call, people['co.officer']), []);
+  const denied = await call('GET', '/api/v1/approvals', { as: people['da.analyst'] });
+  assert.equal(denied.status, 403);
+  assert.match(denied.json.error, /may not list approvals/);
+  assert.equal((await call('GET', '/api/v1/approvals')).status, 401);
+
+  const listedEntry = audit.readAll().find((e) => e.action === 'workflow.approvals_listed' && e.actor.id === 'pm.approver');
+  assert.deepEqual(listedEntry.detail, { returned: 1, steps: ['WF-WEB-1:1'] });
+
+  await call('POST', '/api/v1/workflows/WF-WEB-1/steps/1/decision', { as: people['pm.approver'], body: { decision: 'approve', note: 'ok' } });
+  assert.deepEqual(await waitingFor(call, people['pm.approver']), [], 'a decided step leaves the list');
+});
+
+withApi('once escalated, more roles see a step; past its deadline, nobody does', async ({ call, people, engine, advance }) => {
+  await call('POST', '/api/v1/workflows', { as: people['pm.starter'], body: PAY_AND_NOTIFY });
+  advance(5 * HOUR);
+  assert.deepEqual((await engine.checkApprovalDelays()).escalated, ['WF-WEB-1:1']);
+  for (const who of ['pm.approver', 'ops.manager', 'co.officer']) assert.deepEqual(await waitingFor(call, people[who]), ['WF-WEB-1:1'], who);
+  assert.deepEqual(await waitingFor(call, people['pm.starter']), [], 'still never the starter');
+
+  advance(20 * HOUR); // past the 24-hour deadline, before any sweep has expired it
+  for (const who of ['pm.approver', 'ops.manager', 'co.officer']) assert.deepEqual(await waitingFor(call, people[who]), [], `${who}: it can no longer be decided`);
 });
 
 withApi('viewing a workflow is checked and logged; a missing one is 404', async ({ call, people, audit }) => {

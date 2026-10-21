@@ -18,6 +18,7 @@
 //   resumeWorkflow({ user, workflowId })                → retry a failed workflow from the failed step
 //   getWorkflow(workflowId)                             → { run, actions }   (internal: no permission check)
 //   viewWorkflow({ user, workflowId })                  → { run, actions }   (for people: checked and logged)
+//   listPendingApprovals({ user })                      → the steps waiting that THIS user may decide now
 //
 // Idempotent: the same workflowId with the same actions returns the existing run;
 // each action runs with the idempotency key "<workflowId>:<step>", so a retry,
@@ -254,6 +255,27 @@ export function createWorkflowEngine({
     }
     log('workflow.viewed', { detail: { status: wf.run.status } });
     return wf;
+  }
+
+  // The high-risk steps waiting for approval that this user may decide right now:
+  // by role (approvers, or the wider escalated roles once a step is escalated),
+  // never in a workflow they started, and not past its deadline. Oldest first.
+  async function listPendingApprovals({ user } = {}) {
+    const actor = authorise(user, ESCALATED_APPROVER_ROLES, 'approvals', 'list approvals');
+    const { rows } = await db.query(
+      `SELECT a.*, r.name AS workflow_name, r.requested_by FROM workflow_actions a JOIN workflow_runs r ON r.id = a.run_id
+       WHERE a.status = 'awaiting_approval' AND r.requested_by <> $1 ORDER BY a.approval_requested_at, a.run_id, a.step`,
+      [user.id],
+    );
+    const t = now().getTime();
+    const mine = rows
+      .map((r) => ({ workflowId: r.run_id, workflowName: r.workflow_name, requestedBy: r.requested_by, ...actionFromRow(r) }))
+      .filter((a) => roleAllowed(user.role, a.escalatedAt ? ESCALATED_APPROVER_ROLES : APPROVER_ROLES) && t < Date.parse(a.deadlineAt));
+    audit.append({
+      correlationId: 'approvals', actor, action: 'workflow.approvals_listed',
+      detail: { returned: mine.length, steps: mine.map((a) => `${a.workflowId}:${a.step}`) },
+    });
+    return mine;
   }
 
   async function resumeWorkflow({ user, workflowId } = {}) {
@@ -607,5 +629,5 @@ export function createWorkflowEngine({
     });
   }
 
-  return { startWorkflow, resumeWorkflow, decide, checkApprovalDelays, startApprovalTimer, getWorkflow, viewWorkflow, advance };
+  return { startWorkflow, resumeWorkflow, decide, checkApprovalDelays, startApprovalTimer, getWorkflow, viewWorkflow, listPendingApprovals, advance };
 }

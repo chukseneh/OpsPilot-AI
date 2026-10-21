@@ -134,6 +134,7 @@ manager, security officer, financial analyst, system tester, data analyst.
 | `POST /workflows` | process or operations manager | `{ workflowId, name, actions: [{ type, params }] }` | Low-risk steps run at once; a high-risk step waits for approval. Safe to repeat (same id, same actions). |
 | `GET /workflows/:workflowId` | process, operations manager, compliance officer | | The run and every step, with its risk level and reasons. |
 | `POST /workflows/:workflowId/resume` | process or operations manager | | Retries a failed workflow from the failed step; nothing that ran runs again. |
+| `GET /approvals` | process manager; operations manager or compliance officer for escalated steps | | The high-risk steps waiting that **you** may decide now, oldest first, with why each is high risk and when it expires. Never your own workflows. |
 | `POST /workflows/:workflowId/steps/:step/decision` | process manager; once escalated, also operations manager or compliance officer | `{ decision: "approve" \| "reject", note }` | Never the person who started the workflow. The note is the recorded rationale. Safe to repeat. |
 
 An approval not decided in 4 hours is escalated; at 24 hours it expires as rejected (or

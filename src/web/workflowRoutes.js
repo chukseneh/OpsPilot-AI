@@ -7,6 +7,7 @@
 //   GET  /api/v1/workflows/:workflowId                     the workflow and its steps
 //   POST /api/v1/workflows/:workflowId/resume              retry a failed workflow from its failed step
 //   POST /api/v1/workflows/:workflowId/steps/:step/decision  { decision: 'approve' | 'reject', note }
+//   GET  /api/v1/approvals                                 the steps waiting that you may decide now
 
 import { ApiRequestError } from './errors.js';
 
@@ -17,6 +18,10 @@ const stepNumber = (text) => {
 
 export function workflowRoutes({ workflows }) {
   return [
+    {
+      method: 'GET', path: '/api/v1/approvals', auth: 'session',
+      handle: async ({ user }) => ({ body: { approvals: await workflows.listPendingApprovals({ user }) } }),
+    },
     {
       method: 'POST', path: '/api/v1/workflows', auth: 'session',
       handle: async ({ user, body }) => ({
